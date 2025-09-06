@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y dotnet-sdk-3.1
 WORKDIR /app
 
 # Copy backend files
-COPY almaghribi/backend ./backend
+COPY ./backend ./backend
 
 # Build the backend
 WORKDIR /app/backend
