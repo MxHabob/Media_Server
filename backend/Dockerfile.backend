@@ -1,20 +1,19 @@
 FROM jellyfin/jellyfin:10 AS base
 
-# Install build tools for .NET
-RUN apt-get update && apt-get install -y dotnet-sdk-3.1
+# Install .NET SDK 8.0 (official way)
+RUN apt-get update && apt-get install -y wget apt-transport-https && \
+    wget https://packages.microsoft.com/config/debian/11/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
+    dpkg -i packages-microsoft-prod.deb && \
+    apt-get update && \
+    apt-get install -y dotnet-sdk-8.0
 
-# Set working directory
 WORKDIR /app
-
-# Copy backend files
 COPY ./backend ./backend
 
-# Build the backend
 WORKDIR /app/backend
 RUN dotnet build Jellyfin.Server.csproj -c Release -o /app/jellyfin
 
-# Final stage
 FROM jellyfin/jellyfin:10
 COPY --from=base /app/jellyfin /app/jellyfin
 WORKDIR /app/jellyfin
-CMD ["dotnet", "Jellyfin.Server.dll", "--webdir=/app/frontend/dist"] # Serve frontend from build output
+CMD ["dotnet", "Jellyfin.Server.dll", "--webdir=/app/frontend/dist"]
