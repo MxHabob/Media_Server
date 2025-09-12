@@ -2,11 +2,10 @@ FROM jellyfin/jellyfin:latest AS base
 
 # Build your custom backend
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
-WORKDIR /src/jellyfin  # Change WORKDIR to the jellyfin subdirectory
+WORKDIR /src
 
-# Copy the entire source code, then navigate to the jellyfin folder
-COPY . .
-WORKDIR /src/jellyfin  # Ensure the context is set to the jellyfin folder
+# Copy only the jellyfin directory to the working directory
+COPY jellyfin/ .
 
 # Restore dependencies then build the solution
 RUN dotnet restore Jellyfin.sln
