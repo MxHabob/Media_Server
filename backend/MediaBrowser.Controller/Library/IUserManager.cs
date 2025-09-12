@@ -123,6 +123,23 @@ namespace MediaBrowser.Controller.Library
         Task<User?> AuthenticateUser(string username, string password, string remoteEndPoint, bool isUserSession);
 
         /// <summary>
+        /// Authenticates a user by PIN.
+        /// </summary>
+        /// <param name="pin">The PIN to authenticate with.</param>
+        /// <param name="remoteEndPoint">Remote endpoint string.</param>
+        /// <param name="isUserSession">Whether this is a user session.</param>
+        /// <returns>The authenticated user or null.</returns>
+        Task<User?> AuthenticateUserByPinAsync(string pin, string remoteEndPoint, bool isUserSession);
+
+        /// <summary>
+        /// Generates PINs and users for a subscription type.
+        /// </summary>
+        /// <param name="count">Number of pins to generate.</param>
+        /// <param name="subscriptionType">Subscription type.</param>
+        /// <returns>List of generated pins.</returns>
+        Task<List<string>> GeneratePinsAsync(int count, SubscriptionType subscriptionType);
+
+        /// <summary>
         /// Starts the forgot password process.
         /// </summary>
         /// <param name="enteredUsername">The entered username.</param>

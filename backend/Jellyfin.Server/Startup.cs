@@ -74,20 +74,6 @@ namespace Jellyfin.Server
             services.AddJellyfinApi(_serverApplicationHost.GetApiPluginAssemblies(), _serverConfigurationManager.GetNetworkConfiguration());
             services.AddJellyfinDbContext(_serverApplicationHost.ConfigurationManager, _configuration);
             services.AddJellyfinApiSwagger();
-            services.AddAuthentication(CustomAuthenticationHandler.AuthenticationScheme).AddScheme<AuthenticationSchemeOptions, CustomAuthenticationHandler>(CustomAuthenticationHandler.AuthenticationScheme, null);
-
-            services.AddRateLimiter(options =>
-            {
-                options.AddPolicy("PinLogin", new RateLimitPolicy
-                {
-                    Limit = 5,
-                    Window = TimeSpan.FromMinutes(1),
-                    QueueLimit = 0
-                });
-            });
-            
-            // configure custom legacy authentication
-            services.AddCustomAuthentication();
 
             services.AddJellyfinApiAuthorization();
 

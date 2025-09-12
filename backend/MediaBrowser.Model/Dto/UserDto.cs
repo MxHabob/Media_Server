@@ -19,19 +19,7 @@ namespace MediaBrowser.Model.Dto
             Policy = new UserPolicy();
         }
         
-        public class AuthenticatePinRequest
-        {
-            [Required]
-            public string Pin { get; set; }
-        }
-
-        public class GeneratePinsRequest
-        {
-            [Required]
-            public int Count { get; set; }
-            [Required]
-            public SubscriptionType SubscriptionType { get; set; }
-        }
+        
         /// <summary>
         /// Gets or sets the name.
         /// </summary>

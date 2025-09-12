@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
@@ -7,6 +8,7 @@ using Jellyfin.Data;
 using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Controller.Authentication;
 using MediaBrowser.Controller.Net;
+using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -73,8 +75,7 @@ namespace Jellyfin.Api.Auth
                         new Claim(ClaimTypes.Name, user.Username),
                         new Claim(ClaimTypes.Role, role),
                         new Claim(InternalClaimTypes.UserId, user.Id.ToString("N", CultureInfo.InvariantCulture)),
-                        new Claim(InternalClaimTypes.IsPinAuth, "true"), // Custom claim to identify PIN users
-                        new Claim(InternalClaimTypes.Token, Guid.NewGuid().ToString("N")) // Generate a token for session
+                        new Claim(InternalClaimTypes.Token, Guid.NewGuid().ToString("N"))
                     };
 
                     var identity = new ClaimsIdentity(claims, Scheme.Name);

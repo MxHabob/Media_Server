@@ -30,7 +30,6 @@ using MediaBrowser.Model.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography; // Added for secure PIN generation
-using BCrypt.Net; // Added for PIN hashing (install via NuGet)
 
 namespace Jellyfin.Server.Implementations.Users
 {
@@ -194,7 +193,7 @@ namespace Jellyfin.Server.Implementations.Users
                 _defaultPasswordResetProvider.GetType().FullName!)
             {
                 InternalId = max + 1,
-                PinCode = pin != null ? BCrypt.HashPassword(pin) : null,
+                PinCode = pin != null ? BCrypt.Net.BCrypt.HashPassword(pin) : null,
                 SubscriptionType = subscriptionType,
                 ExpirationDate = CalculateExpirationDate(subscriptionType)
             };
@@ -294,7 +293,7 @@ namespace Jellyfin.Server.Implementations.Users
             }
 
             // Find user by PIN (hashed comparison)
-            var user = Users.FirstOrDefault(u => u.PinCode != null && BCrypt.Verify(pin, u.PinCode));
+            var user = Users.FirstOrDefault(u => u.PinCode != null && BCrypt.Net.BCrypt.Verify(pin, u.PinCode));
             if (user == null)
             {
                 _logger.LogInformation("Authentication request for PIN has been denied (IP: {IP}).", remoteEndPoint);

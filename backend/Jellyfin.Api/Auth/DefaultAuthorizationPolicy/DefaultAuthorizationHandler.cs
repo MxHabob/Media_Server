@@ -42,10 +42,9 @@ namespace Jellyfin.Api.Auth.DefaultAuthorizationPolicy
         {
             var isApiKey = context.User.GetIsApiKey();
             var userId = context.User.GetUserId();
-            var isPinAuth = context.User.HasClaim(c => c.Type == InternalClaimTypes.IsPinAuth && c.Value == "true");
 
             // This likely only happens during the wizard, so skip the default checks and let any other handlers do it
-            if (!isApiKey && !isPinAuth && userId.IsEmpty())
+            if (!isApiKey && userId.IsEmpty())
             {
                 return Task.CompletedTask;
             }
