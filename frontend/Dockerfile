@@ -11,4 +11,4 @@ RUN npm install
 COPY frontend/ .
 
 # Build the Webpack project
-RUN npm run build:production
+RUN npm run start
