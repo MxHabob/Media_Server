@@ -8,8 +8,8 @@ WORKDIR /src
 COPY . .
 
 # Restore dependencies then build the solution
-RUN dotnet restore "Jellyfin.sln"
-RUN dotnet build "Jellyfin.sln" -c Release --no-restore \
+RUN dotnet restore Jellyfin.sln
+RUN dotnet build Jellyfin.sln -c Release --no-restore \
     -p:TreatWarningsAsErrors=false \
     -p:NoWarn=1591 \
     -p:RunAnalyzersDuringBuild=false
