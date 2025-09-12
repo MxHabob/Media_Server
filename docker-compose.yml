@@ -4,7 +4,7 @@ services:
   jellyfin-backend:
     build:
       context: .
-      dockerfile: backend/Dockerfile.backend
+      dockerfile: backend/Dockerfile
     container_name: jellyfin-backend
     volumes:
       - config:/config
@@ -24,7 +24,7 @@ services:
   jellyfin-frontend:
     build:
       context: .
-      dockerfile: frontend/Dockerfile.frontend
+      dockerfile: frontend/Dockerfile
     container_name: jellyfin-frontend
     ports:
       - "80:80"
