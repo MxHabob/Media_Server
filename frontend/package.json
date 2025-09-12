@@ -1,8 +1,8 @@
 {
-  "name": "jellyfin-web",
+  "name": "media-web",
   "version": "10.11.0",
-  "description": "Web interface for Jellyfin",
-  "repository": "https://github.com/jellyfin/jellyfin-web",
+  "description": "Web interface for Media_Server",
+  "repository": "https://github.com/MxHabob/Media_Server",
   "license": "GPL-2.0-or-later",
   "devDependencies": {
     "@babel/core": "7.27.4",
@@ -154,6 +154,7 @@
   ],
   "scripts": {
     "start": "npm run serve",
+    "dev": "vite",
     "serve": "webpack serve --config webpack.dev.js",
     "build:analyze": "cross-env NODE_ENV=\"production\" webpack --config webpack.analyze.js",
     "build:development": "webpack --config webpack.dev.js",

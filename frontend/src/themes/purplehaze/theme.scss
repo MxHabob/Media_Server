@@ -31,11 +31,11 @@ html {
 }
 
 .pageTitleWithDefaultLogo {
-    background-image: url(@jellyfin/ux-web/banner-light.png);
+    background-image: url(../assets/img/supernovalogo.png);
 }
 
 .layout-tv .pageTitleWithDefaultLogo {
-    background-image: url(@jellyfin/ux-web/icon-transparent.png);
+    background-image: url(../assets/img/supernovalogo.png);
 }
 
 .dialog,
