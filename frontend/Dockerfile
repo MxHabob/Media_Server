@@ -15,7 +15,7 @@ COPY frontend/ .
 COPY .git/ ./.git/
 
 # Build the Webpack project
-RUN npm run build:production -- --no-type-checking
+RUN npm run build:production -- --no-check
 
 # Production stage with nginx
 FROM nginx:alpine AS production
