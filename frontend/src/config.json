@@ -1,5 +1,3 @@
 {
-  "server": "http://localhost:8096",
-  "branding": "MyMediaServer",
-  "theme": "default"
+  "server": "http://localhost:8096"
 }
