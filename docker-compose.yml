@@ -1,8 +1,8 @@
 services:
   jellyfin-backend:
     build:
-      context: .
-      dockerfile: backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: jellyfin-backend
     volumes:
       - config:/config
@@ -13,9 +13,17 @@ services:
       - "8920:8920"   # HTTPS
     restart: unless-stopped
     environment:
-      - JELLYFIN_PublishedServerUrl=http://${JELLYFIN_HOST}
+      - JELLYFIN_PublishedServerUrl=http://${JELLYFIN_HOST:-localhost}
+      - JELLYFIN_FFmpegPath=/usr/bin/ffmpeg
+      - JELLYFIN_ServiceName=jellyfin
+      - JELLYFIN_DataDir=/config
+      - JELLYFIN_CacheDir=/cache
+      - JELLYFIN_LogDir=/config/log
+      - JELLYFIN_HOST_WEB_CLIENT=false
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    networks:
+      - jellyfin-network
 
   jellyfin-frontend:
     build:
@@ -27,7 +35,13 @@ services:
     restart: unless-stopped
     depends_on:
       - jellyfin-backend
+    networks:
+      - jellyfin-network
 
 volumes:
   config:
   cache:
+
+networks:
+  jellyfin-network:
+    driver: bridge
