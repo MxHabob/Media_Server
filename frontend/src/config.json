@@ -1,3 +1,45 @@
 {
-  "server": "http://localhost:8096"
+    "includeCorsCredentials": false,
+    "multiserver": false,
+    "themes": [
+        {
+            "name": "Dark",
+            "id": "dark",
+            "default": true,
+            "color": "#00a4dc"
+        },
+        {
+            "name": "Light",
+            "id": "light",
+            "default": false,
+            "color": "#00a4dc"
+        },
+        {
+            "name": "Apple TV",
+            "id": "appletv",
+            "default": false,
+            "color": "#bcbcbc"
+        },
+        {
+            "name": "Blue Radiance",
+            "id": "blueradiance",
+            "default": false,
+            "color": "#00a4dc"
+        },
+        {
+            "name": "Purple Haze",
+            "id": "purplehaze",
+            "default": false,
+            "color": "#48c3c8"
+        },
+        {
+            "name": "Windows Media Center",
+            "id": "wmc",
+            "default": false,
+            "color": "#00a4dc"
+        }
+    ],
+    "menuLinks": [],
+    "servers": [],
+    "plugins": []
 }

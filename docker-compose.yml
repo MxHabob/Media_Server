@@ -1,16 +1,16 @@
 services:
-  jellyfin-backend:
+  jellyfin:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: jellyfin-backend
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: jellyfin
     volumes:
-      - config:/config
-      - cache:/cache
+      - ./jellyfin-config:/config
+      - ./jellyfin-cache:/cache
       - /home/mohamed/media:/media
     ports:
-      - "8096:8096"   # HTTP
-      - "8920:8920"   # HTTPS
+      - "8096:8096"   # HTTP (includes web client)
+      - "8920:8920"   # HTTPS (includes web client)
     restart: unless-stopped
     environment:
       - JELLYFIN_PublishedServerUrl=http://${JELLYFIN_HOST:-localhost}
@@ -19,28 +19,11 @@ services:
       - JELLYFIN_DataDir=/config
       - JELLYFIN_CacheDir=/cache
       - JELLYFIN_LogDir=/config/log
-      - JELLYFIN_HOST_WEB_CLIENT=false
+      - JELLYFIN_HOST_WEB_CLIENT=true
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
       - jellyfin-network
-
-  jellyfin-frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
-    container_name: jellyfin-frontend
-    ports:
-      - "80:80"
-    restart: unless-stopped
-    depends_on:
-      - jellyfin-backend
-    networks:
-      - jellyfin-network
-
-volumes:
-  config:
-  cache:
 
 networks:
   jellyfin-network:

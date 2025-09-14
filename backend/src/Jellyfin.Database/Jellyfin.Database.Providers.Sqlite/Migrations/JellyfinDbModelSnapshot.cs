@@ -1273,6 +1273,9 @@ namespace Jellyfin.Server.Implementations.Migrations
                     b.Property<bool>("EnableUserPreferenceAccess")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("ExpirationDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("HidePlayedInLatest")
                         .HasColumnType("INTEGER");
 
@@ -1312,6 +1315,10 @@ namespace Jellyfin.Server.Implementations.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PinCode")
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("PlayDefaultAudioTrack")
                         .HasColumnType("INTEGER");
 
@@ -1326,6 +1333,9 @@ namespace Jellyfin.Server.Implementations.Migrations
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SubscriptionType")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("SubtitleLanguagePreference")
