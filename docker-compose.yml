@@ -1,21 +1,21 @@
 services:
-  jellyfin:
+  media-server:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: jellyfin
+    container_name: media-server
     volumes:
-      - ./jellyfin-config:/config
-      - ./jellyfin-cache:/cache
+      - ./media-server-config:/config
+      - ./media-server-cache:/cache
       - /home/mohamed/media:/media
     ports:
       - "8096:8096"   # HTTP (includes web client)
       - "8920:8920"   # HTTPS (includes web client)
     restart: unless-stopped
     environment:
-      - JELLYFIN_PublishedServerUrl=http://${JELLYFIN_HOST:-localhost}
+      - JELLYFIN_PublishedServerUrl=http://${MEDIA_SERVER_HOST:-localhost}
       - JELLYFIN_FFmpegPath=/usr/bin/ffmpeg
-      - JELLYFIN_ServiceName=jellyfin
+      - JELLYFIN_ServiceName=media-server
       - JELLYFIN_DataDir=/config
       - JELLYFIN_CacheDir=/cache
       - JELLYFIN_LogDir=/config/log
@@ -23,8 +23,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
-      - jellyfin-network
+      - media-server-network
 
 networks:
-  jellyfin-network:
+  media-server-network:
     driver: bridge
