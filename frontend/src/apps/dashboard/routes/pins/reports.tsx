@@ -8,7 +8,7 @@ type PinUser = {
 };
 
 export default function PinReportsPage() {
-    const [status, setStatus] = useState<'active'|'expired'|'all'>('active');
+    const [status, setStatus] = useState<'active' | 'expired' | 'all'>('active');
     const [subscriptionType, setSubscriptionType] = useState<number | ''>('');
     const [items, setItems] = useState<PinUser[]>([]);
     const [report, setReport] = useState<any>(null);
@@ -41,21 +41,21 @@ export default function PinReportsPage() {
     }, [status, subscriptionType]);
 
     const content = useMemo(() => (
-        <div className="padded page type-interior">
+        <div className='padded page type-interior'>
             <h2>PIN Users</h2>
             <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                <div className="inputContainer">
-                    <label htmlFor="pin-status">Status</label>
-                    <select id="pin-status" value={status} onChange={(e) => setStatus(e.target.value as any)}>
-                        <option value="active">Active</option>
-                        <option value="expired">Expired</option>
-                        <option value="all">All</option>
+                <div className='inputContainer'>
+                    <label htmlFor='pin-status'>Status</label>
+                    <select id='pin-status' value={status} onChange={(e) => setStatus(e.target.value as any)}>
+                        <option value='active'>Active</option>
+                        <option value='expired'>Expired</option>
+                        <option value='all'>All</option>
                     </select>
                 </div>
-                <div className="inputContainer">
-                    <label htmlFor="pin-type">Subscription Type</label>
-                    <select id="pin-type" value={subscriptionType} onChange={(e) => setSubscriptionType(e.target.value === '' ? '' : parseInt(e.target.value, 10))}>
-                        <option value="">All</option>
+                <div className='inputContainer'>
+                    <label htmlFor='pin-type'>Subscription Type</label>
+                    <select id='pin-type' value={subscriptionType} onChange={(e) => setSubscriptionType(e.target.value === '' ? '' : parseInt(e.target.value, 10))}>
+                        <option value=''>All</option>
                         <option value={1}>Six Hours</option>
                         <option value={2}>Twelve Hours</option>
                         <option value={3}>Weekly</option>
@@ -66,8 +66,8 @@ export default function PinReportsPage() {
                 </div>
                 <div style={{ alignSelf: 'flex-end' }}>
                     <button
-                        is="emby-button"
-                        className="raised"
+                        is='emby-button'
+                        className='raised'
                         disabled={loading}
                         onClick={() => {
                             const csv = ['Id,Name,SubscriptionType,ExpirationDate']
@@ -85,7 +85,7 @@ export default function PinReportsPage() {
                 </div>
             </div>
 
-            {error && <div className="warning" style={{ marginTop: '.5rem' }}>{error}</div>}
+            {error && <div className='warning' style={{ marginTop: '.5rem' }}>{error}</div>}
 
             {report && (
                 <div style={{ marginTop: '1rem' }}>
@@ -95,7 +95,7 @@ export default function PinReportsPage() {
             )}
 
             <div style={{ marginTop: '1rem', overflowX: 'auto' }}>
-                <table className="detailTable">
+                <table className='detailTable'>
                     <thead>
                         <tr>
                             <th>Name</th>
@@ -119,5 +119,4 @@ export default function PinReportsPage() {
 
     return content as any;
 }
-
 

@@ -17,15 +17,15 @@ export default function PinGeneratePage() {
     const [error, setError] = useState<string | null>(null);
 
     const content = useMemo(() => (
-        <div className="padded page type-interior">
+        <div className='padded page type-interior'>
             <h2>Generate PINs</h2>
-            <div className="inputContainer">
-                <label htmlFor="pin-count">Count</label>
-                <input id="pin-count" type="number" min={1} max={1000} value={count} onChange={(e) => setCount(parseInt(e.target.value || '0', 10))} />
+            <div className='inputContainer'>
+                <label htmlFor='pin-count'>Count</label>
+                <input id='pin-count' type='number' min={1} max={1000} value={count} onChange={(e) => setCount(parseInt(e.target.value || '0', 10))} />
             </div>
-            <div className="inputContainer">
-                <label htmlFor="pin-subscription">Subscription Type</label>
-                <select id="pin-subscription" value={subscriptionType} onChange={(e) => setSubscriptionType(parseInt(e.target.value, 10))}>
+            <div className='inputContainer'>
+                <label htmlFor='pin-subscription'>Subscription Type</label>
+                <select id='pin-subscription' value={subscriptionType} onChange={(e) => setSubscriptionType(parseInt(e.target.value, 10))}>
                     {subscriptionOptions.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
@@ -33,8 +33,8 @@ export default function PinGeneratePage() {
             </div>
             <div style={{ marginTop: '.5rem' }}>
                 <button
-                    is="emby-button"
-                    className="raised"
+                    is='emby-button'
+                    className='raised'
                     disabled={loading || count < 1}
                     onClick={async () => {
                         setError(null);
@@ -53,15 +53,15 @@ export default function PinGeneratePage() {
                 >Generate</button>
             </div>
 
-            {error && <div className="warning" style={{ marginTop: '.5rem' }}>{error}</div>}
+            {error && <div className='warning' style={{ marginTop: '.5rem' }}>{error}</div>}
 
             {pins.length > 0 && (
                 <div style={{ marginTop: '1rem' }}>
                     <h3>Generated PINs</h3>
                     <pre>{pins.join('\n')}</pre>
                     <button
-                        is="emby-button"
-                        className="raised"
+                        is='emby-button'
+                        className='raised'
                         onClick={() => {
                             const blob = new Blob([pins.join('\n')], { type: 'text/plain' });
                             const url = URL.createObjectURL(blob);
@@ -79,5 +79,4 @@ export default function PinGeneratePage() {
 
     return content as any;
 }
-
 
