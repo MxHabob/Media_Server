@@ -50,9 +50,16 @@ function authenticateUserByName(page, apiClient, url, username, password) {
 
 function authenticateUserByPin(page, apiClient, url, pin) { // New function
     loading.show();
-    apiClient.authenticateUserByPin(pin).then(function (user) {
+    // Call the same shape as AuthenticateByName: expect AuthenticationResult
+    apiClient.ajax({
+        type: 'POST',
+        url: apiClient.getUrl('/Users/AuthenticateWithPin'),
+        data: JSON.stringify({ Pin: pin }),
+        contentType: 'application/json'
+    }, true).then(res => res.json()).then(function (result) {
+        const user = result.User;
         loading.hide();
-        onLoginSuccessful(user.Id, null, apiClient, url); // No AccessToken returned; handled by CustomAuthenticationHandler
+        onLoginSuccessful(user.Id, result.AccessToken, apiClient, url);
     }, function (response) {
         page.querySelector('#txtPin').value = '';
         loading.hide();

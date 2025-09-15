@@ -116,6 +116,45 @@ export default class ConnectionManager {
 
             apiClient.onAuthenticated = (instance, result) => onAuthenticated(instance, result, {}, true);
 
+            // Extend ApiClient with PIN and admin helpers
+            apiClient.authenticateWithPin = (pin) => {
+                return ajax({
+                    type: 'POST',
+                    url: apiClient.getUrl('/Users/AuthenticateWithPin'),
+                    data: JSON.stringify({ Pin: pin }),
+                    contentType: 'application/json'
+                }).then((result) => {
+                    apiClient.setAuthenticationInfo(result.AccessToken, result.User.Id);
+                    return result;
+                });
+            };
+
+            apiClient.generatePins = (count, subscriptionType) => {
+                return ajax({
+                    type: 'POST',
+                    url: apiClient.getUrl('/Users/GeneratePins'),
+                    data: JSON.stringify({ Count: count, SubscriptionType: subscriptionType }),
+                    contentType: 'application/json'
+                });
+            };
+
+            apiClient.getPinUsers = (params = {}) => {
+                const query = new URLSearchParams();
+                if (params.status) query.set('status', params.status);
+                if (params.subscriptionType !== undefined && params.subscriptionType !== null) query.set('subscriptionType', params.subscriptionType);
+                return ajax({
+                    type: 'GET',
+                    url: apiClient.getUrl('/Users/Pins' + (query.toString() ? ('?' + query.toString()) : ''))
+                });
+            };
+
+            apiClient.getPinReport = () => {
+                return ajax({
+                    type: 'GET',
+                    url: apiClient.getUrl('/Users/PinReport')
+                });
+            };
+
             if (!existingServers.length) {
                 const credentials = credentialProvider.credentials();
                 credentials.Servers = [existingServer];

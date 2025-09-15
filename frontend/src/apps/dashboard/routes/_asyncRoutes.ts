@@ -31,3 +31,8 @@ export const ASYNC_ADMIN_ROUTES: AsyncRoute[] = [
     { path: 'users/password', type: AppType.Dashboard },
     { path: 'users/profile', type: AppType.Dashboard }
 ];
+
+export const ASYNC_ADMIN_PIN_ROUTES: AsyncRoute[] = [
+    { path: 'pins/generate', type: AppType.Dashboard },
+    { path: 'pins/reports', type: AppType.Dashboard }
+];

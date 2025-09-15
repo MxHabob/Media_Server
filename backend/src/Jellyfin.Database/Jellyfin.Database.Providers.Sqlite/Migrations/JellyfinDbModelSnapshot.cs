@@ -15,7 +15,7 @@ namespace Jellyfin.Server.Implementations.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "9.0.7");
+            modelBuilder.HasAnnotation("ProductVersion", "9.0.8");
 
             modelBuilder.Entity("Jellyfin.Database.Implementations.Entities.AccessSchedule", b =>
                 {
@@ -1273,9 +1273,6 @@ namespace Jellyfin.Server.Implementations.Migrations
                     b.Property<bool>("EnableUserPreferenceAccess")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTime?>("ExpirationDate")
-                        .HasColumnType("TEXT");
-
                     b.Property<bool>("HidePlayedInLatest")
                         .HasColumnType("INTEGER");
 
@@ -1315,10 +1312,6 @@ namespace Jellyfin.Server.Implementations.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("PinCode")
-                        .HasMaxLength(255)
-                        .HasColumnType("TEXT");
-
                     b.Property<bool>("PlayDefaultAudioTrack")
                         .HasColumnType("INTEGER");
 
@@ -1333,9 +1326,6 @@ namespace Jellyfin.Server.Implementations.Migrations
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SubscriptionType")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("SubtitleLanguagePreference")

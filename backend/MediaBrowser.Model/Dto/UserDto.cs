@@ -105,6 +105,16 @@ namespace MediaBrowser.Model.Dto
         /// <value>The primary image aspect ratio.</value>
         public double? PrimaryImageAspectRatio { get; set; }
 
+        /// <summary>
+        /// Gets or sets the subscription type for the user (enum value).
+        /// </summary>
+        public int SubscriptionType { get; set; }
+
+        /// <summary>
+        /// Gets or sets the subscription expiration date, or null for lifetime.
+        /// </summary>
+        public DateTime? SubscriptionExpirationDate { get; set; }
+
         /// <inheritdoc />
         public override string ToString()
         {

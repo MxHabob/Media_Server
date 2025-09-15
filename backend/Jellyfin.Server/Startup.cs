@@ -75,6 +75,7 @@ namespace Jellyfin.Server
             services.AddJellyfinDbContext(_serverApplicationHost.ConfigurationManager, _configuration);
             services.AddJellyfinApiSwagger();
 
+            services.AddCustomAuthentication();
             services.AddJellyfinApiAuthorization();
 
             var productHeader = new ProductInfoHeaderValue(

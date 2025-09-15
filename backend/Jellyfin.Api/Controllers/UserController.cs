@@ -257,17 +257,18 @@ public class UserController : BaseJellyfinApiController
     }
 
     /// <summary>
-    /// Authenticates a user by PIN.
+    /// Authenticates a user by PIN and returns an authentication result with access token.
     /// </summary>
     /// <param name="request">The <see cref="AuthenticatePinRequest"/> request containing the PIN.</param>
     /// <response code="200">User authenticated.</response>
     /// <response code="401">Invalid PIN or expired subscription.</response>
-    /// <returns>A <see cref="Task"/> containing a <see cref="UserDto"/> with information about the authenticated user.</returns>
+    /// <returns>An <see cref="AuthenticationResult"/> with access token and user info.</returns>
     [HttpPost("AuthenticateWithPin")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<UserDto>> AuthenticateWithPin([FromBody, Required] AuthenticatePinRequest request)
+    public async Task<ActionResult<AuthenticationResult>> AuthenticateWithPin([FromBody, Required] AuthenticatePinRequest request)
     {
+        var auth = await _authContext.GetAuthorizationInfo(Request).ConfigureAwait(false);
         var remoteIp = HttpContext.GetNormalizedRemoteIP().ToString();
         var user = await _userManager.AuthenticateUserByPinAsync(request.Pin, remoteIp, true).ConfigureAwait(false);
         if (user == null)
@@ -275,8 +276,17 @@ public class UserController : BaseJellyfinApiController
             return Unauthorized("Invalid PIN or expired subscription.");
         }
 
-        var result = _userManager.GetUserDto(user, remoteIp);
-        return Ok(result);
+        var result = await _sessionManager.AuthenticateNewSession(new AuthenticationRequest
+        {
+            App = auth.Client,
+            AppVersion = auth.Version,
+            DeviceId = auth.DeviceId,
+            DeviceName = auth.Device,
+            RemoteEndPoint = remoteIp,
+            UserId = user.Id
+        }).ConfigureAwait(false);
+
+        return result;
     }
 
     /// <summary>
@@ -294,6 +304,66 @@ public class UserController : BaseJellyfinApiController
     {
         var pins = await _userManager.GeneratePinsAsync(request.Count, request.SubscriptionType).ConfigureAwait(false);
         return Ok(pins);
+    }
+
+    /// <summary>
+    /// Lists users that were created with PINs, with optional filters.
+    /// </summary>
+    /// <param name="status">active|expired|all (default active)</param>
+    /// <param name="subscriptionType">Optional subscription type filter.</param>
+    /// <response code="200">PIN users returned.</response>
+    [HttpGet("Pins")]
+    [Authorize(Policy = Policies.RequiresElevation)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<IEnumerable<UserDto>> GetPinUsers(
+        [FromQuery] string? status,
+        [FromQuery] int? subscriptionType)
+    {
+        var now = DateTime.UtcNow;
+        var users = _userManager.Users
+            .Where(u => u.PinCode != null);
+
+        if (subscriptionType.HasValue)
+        {
+            users = users.Where(u => (int)u.SubscriptionType == subscriptionType.Value);
+        }
+
+        var normalized = (status ?? "active").ToLowerInvariant();
+        users = normalized switch
+        {
+            "expired" => users.Where(u => u.ExpirationDate.HasValue && u.ExpirationDate.Value < now),
+            "all" => users,
+            _ => users.Where(u => !u.ExpirationDate.HasValue || u.ExpirationDate.Value >= now)
+        };
+
+        var result = users
+            .OrderBy(u => u.Username)
+            .Select(u => _userManager.GetUserDto(u, HttpContext.GetNormalizedRemoteIP().ToString()));
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Returns aggregate counts for PIN users.
+    /// </summary>
+    /// <response code="200">Report returned.</response>
+    [HttpGet("PinReport")]
+    [Authorize(Policy = Policies.RequiresElevation)]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public ActionResult<object> GetPinReport()
+    {
+        var now = DateTime.UtcNow;
+        var users = _userManager.Users.Where(u => u.PinCode != null).ToList();
+        var total = users.Count;
+        var active = users.Count(u => !u.ExpirationDate.HasValue || u.ExpirationDate.Value >= now);
+        var expired = total - active;
+
+        var byType = users
+            .GroupBy(u => u.SubscriptionType)
+            .Select(g => new { SubscriptionType = g.Key, Total = g.Count(), Active = g.Count(u => !u.ExpirationDate.HasValue || u.ExpirationDate.Value >= now), Expired = g.Count(u => u.ExpirationDate.HasValue && u.ExpirationDate.Value < now) })
+            .OrderBy(x => x.SubscriptionType)
+            .ToList();
+
+        return Ok(new { Total = total, Active = active, Expired = expired, ByType = byType });
     }
 
     /// <summary>

@@ -463,6 +463,8 @@ namespace Jellyfin.Server.Implementations.Users
                 LastLoginDate = user.LastLoginDate,
                 LastActivityDate = user.LastActivityDate,
                 PrimaryImageTag = user.ProfileImage is not null ? _imageProcessor.GetImageCacheTag(user) : null,
+                SubscriptionType = (int)user.SubscriptionType,
+                SubscriptionExpirationDate = user.ExpirationDate,
                 Configuration = new UserConfiguration
                 {
                     SubtitleMode = user.SubtitleMode,

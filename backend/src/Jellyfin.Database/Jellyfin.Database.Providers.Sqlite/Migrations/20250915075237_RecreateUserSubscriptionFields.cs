@@ -1,16 +1,17 @@
-#pragma warning disable CS1591
-#pragma warning disable SA1601
-
-using System;
+﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
-namespace Jellyfin.Server.Implementations.Migrations
+#nullable disable
+
+namespace Jellyfin.Database.Providers.Sqlite.Migrations
 {
-    public partial class AddExpirationDateToUsers : Migration
+    /// <inheritdoc />
+    public partial class RecreateUserSubscriptionFields : Migration
     {
+        /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<DateTime?>(
+            migrationBuilder.AddColumn<DateTime>(
                 name: "ExpirationDate",
                 table: "Users",
                 type: "TEXT",
@@ -31,6 +32,7 @@ namespace Jellyfin.Server.Implementations.Migrations
                 defaultValue: 0);
         }
 
+        /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
