@@ -3,6 +3,8 @@ import Backup from '@mui/icons-material/Backup';
 import Lan from '@mui/icons-material/Lan';
 import Schedule from '@mui/icons-material/Schedule';
 import VpnKey from '@mui/icons-material/VpnKey';
+import Lock from '@mui/icons-material/Lock';
+import Assessment from '@mui/icons-material/Assessment';
 import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -61,6 +63,22 @@ const AdvancedDrawerSection = () => {
                         <Schedule />
                     </ListItemIcon>
                     <ListItemText primary={globalize.translate('TabScheduledTasks')} />
+                </ListItemLink>
+            </ListItem>
+            <ListItem disablePadding>
+                <ListItemLink to='/dashboard/pins/generate'>
+                    <ListItemIcon>
+                        <Lock />
+                    </ListItemIcon>
+                    <ListItemText primary='Generate PINs' />
+                </ListItemLink>
+            </ListItem>
+            <ListItem disablePadding>
+                <ListItemLink to='/dashboard/pins/reports'>
+                    <ListItemIcon>
+                        <Assessment />
+                    </ListItemIcon>
+                    <ListItemText primary='PIN Reports' />
                 </ListItemLink>
             </ListItem>
         </List>

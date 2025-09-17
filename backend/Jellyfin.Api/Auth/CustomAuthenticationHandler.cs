@@ -50,39 +50,46 @@ namespace Jellyfin.Api.Auth
         {
             try
             {
-                // Check if this is a PIN authentication request (e.g., via endpoint or header)
-                var isPinAuth = Request.Path.StartsWithSegments("/Users/AuthenticateWithPin")
-                              || Request.Headers.ContainsKey("X-Jellyfin-Pin-Auth");
-
-                if (isPinAuth)
+                // Only handle header-based PIN auth here to avoid interfering with JSON controller actions
+                if (Request.Headers.ContainsKey("X-Jellyfin-Pin-Auth"))
                 {
-                    var pin = Request.Form["Pin"].ToString() ?? Request.Headers["Pin"].ToString();
-                    if (string.IsNullOrWhiteSpace(pin))
+                    string pin = string.Empty;
+                    if (Request.Headers.TryGetValue("Pin", out var pinHeader))
                     {
-                        return AuthenticateResult.NoResult();
+                        pin = pinHeader.ToString();
+                    }
+                    else if (Request.HasFormContentType)
+                    {
+                        var form = await Request.ReadFormAsync().ConfigureAwait(false);
+                        pin = form["Pin"].ToString();
                     }
 
-                    var remoteIp = Context.Connection.RemoteIpAddress?.ToString();
-                    var user = await _userManager.AuthenticateUserByPinAsync(pin, remoteIp ?? string.Empty, true).ConfigureAwait(false);
-                    if (user == null)
+                    if (!string.IsNullOrWhiteSpace(pin))
                     {
-                        return AuthenticateResult.Fail("Invalid PIN or expired subscription.");
+                        var remoteIp = Context.Connection.RemoteIpAddress?.ToString();
+                        var user = await _userManager.AuthenticateUserByPinAsync(pin, remoteIp ?? string.Empty, true).ConfigureAwait(false);
+                        if (user == null)
+                        {
+                            return AuthenticateResult.Fail("Invalid PIN or expired subscription.");
+                        }
+
+                        var role = user.HasPermission(PermissionKind.IsAdministrator) ? UserRoles.Administrator : UserRoles.User;
+                        var claims = new[]
+                        {
+                            new Claim(ClaimTypes.Name, user.Username),
+                            new Claim(ClaimTypes.Role, role),
+                            new Claim(InternalClaimTypes.UserId, user.Id.ToString("N", CultureInfo.InvariantCulture)),
+                            new Claim(InternalClaimTypes.Token, Guid.NewGuid().ToString("N"))
+                        };
+
+                        var identity = new ClaimsIdentity(claims, Scheme.Name);
+                        var principal = new ClaimsPrincipal(identity);
+                        var ticket = new AuthenticationTicket(principal, Scheme.Name);
+
+                        return AuthenticateResult.Success(ticket);
                     }
 
-                    var role = user.HasPermission(PermissionKind.IsAdministrator) ? UserRoles.Administrator : UserRoles.User;
-                    var claims = new[]
-                    {
-                        new Claim(ClaimTypes.Name, user.Username),
-                        new Claim(ClaimTypes.Role, role),
-                        new Claim(InternalClaimTypes.UserId, user.Id.ToString("N", CultureInfo.InvariantCulture)),
-                        new Claim(InternalClaimTypes.Token, Guid.NewGuid().ToString("N"))
-                    };
-
-                    var identity = new ClaimsIdentity(claims, Scheme.Name);
-                    var principal = new ClaimsPrincipal(identity);
-                    var ticket = new AuthenticationTicket(principal, Scheme.Name);
-
-                    return AuthenticateResult.Success(ticket);
+                    return AuthenticateResult.NoResult();
                 }
 
                 // Fallback to existing username/password or API key authentication

@@ -1,0 +1,43 @@
+/* ElegantFin Theme */
+:root[data-theme='elegantfin'] {
+    /* Brand colors */
+    --accent: #2b2d42;
+    --accent-contrast: #ffffff;
+    --bg: #0f1115;
+    --bg-elevated: #151822;
+    --surface: #1b1f2a;
+    --surface-2: #222739;
+    --text: #e5e7eb;
+    --text-muted: #a1a7b3;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --error: #ef4444;
+
+    /* Component tweaks */
+    --radius: 10px;
+    --button-radius: 8px;
+    --input-radius: 8px;
+}
+
+/* Buttons */
+[is='emby-button'],
+button.raised,
+button.flat,
+button.submit {
+    border-radius: var(--button-radius);
+}
+
+/* Cards and panes */
+.paperList,
+.paper,
+.card {
+    background-color: var(--surface);
+    border-radius: var(--radius);
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 { color: var(--text); }
+p, span, div { color: var(--text); }
+.muted { color: var(--text-muted); }
+
+

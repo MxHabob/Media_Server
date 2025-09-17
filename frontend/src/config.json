@@ -37,6 +37,12 @@
             "id": "wmc",
             "default": false,
             "color": "#00a4dc"
+        },
+        {
+            "name": "ElegantFin",
+            "id": "elegantfin",
+            "default": false,
+            "color": "#2b2d42"
         }
     ],
     "menuLinks": [],
