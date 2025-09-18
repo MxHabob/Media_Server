@@ -47,6 +47,14 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* Keep ElegantFin behavior intact but show desktop overlay buttons when ElegantFin is the active theme */
+/* Be robust to where `.layout-desktop` is applied (html, body, or a container) */
+[data-theme="elegantfin"].layout-desktop .cardOverlayButton-br,
+[data-theme="elegantfin"] body.layout-desktop .cardOverlayButton-br,
+[data-theme="elegantfin"] .layout-desktop .cardOverlayButton-br {
+    display: flex !important;
+}
+
 .clipForScreenReader {
     clip: rect(1px, 1px, 1px, 1px);
     clip-path: inset(50%);
