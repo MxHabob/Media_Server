@@ -11,12 +11,7 @@ COPY backend/ .
 RUN dotnet restore
 
 # Publish the application (disable strict code analysis for Docker build)
-RUN dotnet publish Jellyfin.Server/Jellyfin.Server.csproj \
-    --configuration Release --no-restore \
-    --output /app/publish \
-    -p:RunAnalyzers=false \
-    -p:TreatWarningsAsErrors=false \
-    -p:WarningsNotAsErrors=1591
+RUN dotnet publish Jellyfin.Server/Jellyfin.Server.csproj --configuration Release --no-restore --output /app/publish --property:TreatWarningsAsErrors=false --property:GenerateDocumentationFile=false --property:RunAnalyzersDuringBuild=false --verbosity minimal
 
 # Build frontend
 FROM node:20 AS frontend-build
@@ -45,7 +40,7 @@ COPY --from=build /app/publish .
 COPY --from=frontend-build /app/dist /app/jellyfin-web
 
 # Create directories for config and cache
-RUN mkdir -p /config /cache && chown -R 1000:1000 /config /cache
+RUN mkdir -p /config /cache
 
 # Expose the standard Jellyfin ports
 EXPOSE 8096
@@ -61,4 +56,4 @@ ENV JELLYFIN_WebDir=/app/jellyfin-web
 ENV JELLYFIN_HOST_WEB_CLIENT=true
 
 # Run the application
-ENTRYPOINT ["dotnet", "Jellyfin.dll"]
+ENTRYPOINT ["dotnet", "jellyfin.dll"]
