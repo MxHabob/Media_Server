@@ -11,7 +11,12 @@ COPY backend/ .
 RUN dotnet restore
 
 # Publish the application (disable strict code analysis for Docker build)
-RUN dotnet publish Jellyfin.Server/Jellyfin.Server.csproj --configuration Release --no-restore --output /app/publish --property:TreatWarningsAsErrors=false --property:GenerateDocumentationFile=false --property:RunAnalyzersDuringBuild=false --verbosity minimal
+RUN dotnet publish Jellyfin.Server/Jellyfin.Server.csproj \
+    --configuration Release --no-restore \
+    --output /app/publish \
+    -p:RunAnalyzers=false \
+    -p:TreatWarningsAsErrors=false \
+    -p:WarningsNotAsErrors=1591
 
 # Build frontend
 FROM node:20 AS frontend-build
