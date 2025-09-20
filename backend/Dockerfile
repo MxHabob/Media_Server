@@ -61,4 +61,4 @@ ENV JELLYFIN_WebDir=/app/jellyfin-web
 ENV JELLYFIN_HOST_WEB_CLIENT=true
 
 # Run the application
-ENTRYPOINT ["dotnet", "Jellyfin.Server.dll"]
+ENTRYPOINT ["dotnet", "Jellyfin.dll"]
