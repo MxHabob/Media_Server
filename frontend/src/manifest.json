@@ -1,6 +1,6 @@
 {
     "name": "Super",
-    "description": "The Free Software Media System",
+    "description": "Take a break and enjoy movies and shows with Super",
     "lang": "en-US",
     "short_name": "Super",
     "start_url": "index.html#/home",
@@ -9,23 +9,18 @@
     "display": "standalone",
     "icons": [
         {
-            "sizes": "72x72",
-            "src": "favicons/touchicon72.png",
+            "sizes": "92x92",
+            "src": "assets/img/favicon-96x96.png",
             "type": "image/png"
         },
         {
-            "sizes": "114x114",
-            "src": "favicons/touchicon114.png",
-            "type": "image/png"
-        },
-        {
-            "sizes": "144x144",
-            "src": "favicons/touchicon144.png",
+            "sizes": "192x192",
+            "src": "assets/img/web-app-manifest-192x192.png",
             "type": "image/png"
         },
         {
             "sizes": "512x512",
-            "src": "favicons/touchicon512.png",
+            "src": "assets/img/web-app-manifest-512x512.png",
             "type": "image/png"
         }
     ]
