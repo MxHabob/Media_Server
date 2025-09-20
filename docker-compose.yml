@@ -4,6 +4,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     container_name: media-server
+    user: "1000:1000"
     volumes:
       - media-server-config:/config
       - media-server-cache:/cache

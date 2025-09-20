@@ -40,7 +40,7 @@ COPY --from=build /app/publish .
 COPY --from=frontend-build /app/dist /app/jellyfin-web
 
 # Create directories for config and cache
-RUN mkdir -p /config /cache
+RUN mkdir -p /config /cache && chown -R 1000:1000 /config /cache
 
 # Expose the standard Jellyfin ports
 EXPOSE 8096
@@ -56,4 +56,4 @@ ENV JELLYFIN_WebDir=/app/jellyfin-web
 ENV JELLYFIN_HOST_WEB_CLIENT=true
 
 # Run the application
-ENTRYPOINT ["dotnet", "jellyfin.dll"]
+ENTRYPOINT ["dotnet", "Jellyfin.Server.dll"]
