@@ -52,7 +52,13 @@ const config = {
         modules: [
             path.resolve(__dirname, 'src'),
             path.resolve(__dirname, 'node_modules')
-        ]
+        ],
+        // ADD THIS SECTION TO FIX THE CLDR ISSUE
+        fallback: {
+            "cldr": require.resolve("cldrjs"),
+            "cldr/event": require.resolve("cldrjs/dist/event"),
+            "cldr/supplemental": require.resolve("cldrjs/dist/supplemental")
+        }
     },
     plugins: [
         new DefinePlugin({
