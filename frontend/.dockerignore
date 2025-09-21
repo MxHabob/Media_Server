@@ -1,0 +1,8 @@
+.git
+node_modules
+frontend/node_modules
+backend/bin
+backend/obj
+Dockerfile
+docker-compose.yml
+*.log
