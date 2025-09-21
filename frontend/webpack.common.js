@@ -5,7 +5,7 @@ const CopyPlugin = require('copy-webpack-plugin');
 const ForkTsCheckerWebpackPlugin = require('fork-ts-checker-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
-const { DefinePlugin, IgnorePlugin } = require('webpack');
+const { DefinePlugin } = require('webpack');
 const packageJson = require('./package.json');
 
 const Assets = [
@@ -16,8 +16,7 @@ const Assets = [
   '@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker.js',
   '@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker.wasm',
   '@jellyfin/libass-wasm/dist/js/subtitles-octopus-worker-legacy.js',
-  'pdfjs-dist/build/pdf.worker.js',
-  'libpgs/dist/libpgs.worker.js',
+  'pdfjs-dist/build/pdf.worker.mjs',
 ];
 
 const DEV_MODE = process.env.NODE_ENV !== 'production';
@@ -49,12 +48,12 @@ module.exports = {
     ...THEMES_BY_ID,
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.js', '.jsx'],
+    extensions: ['.tsx', '.ts', '.js', '.jsx', '.mjs'],
     modules: [path.resolve(__dirname, 'src'), 'node_modules'],
     alias: {
-      cldr: require.resolve('cldrjs'),
-      'cldr/event': require.resolve('cldrjs/dist/cldr/event'),
-      'cldr/supplemental': require.resolve('cldrjs/dist/cldr/supplemental'),
+      cldr$: 'cldrjs/dist/cldr.js', // Exact match for 'cldr'
+      'cldr/event$': 'cldrjs/dist/cldr/event.js', // Exact match for 'cldr/event'
+      'cldr/supplemental$': 'cldrjs/dist/cldr/supplemental.js', // Exact match for 'cldr/supplemental'
     },
   },
   plugins: [
@@ -179,7 +178,7 @@ module.exports = {
         },
       },
       {
-        test: /\.worker\.ts$/,
+        test: /\.worker\.(ts|js)$/,
         exclude: /node_modules/,
         use: [
           'worker-loader',
@@ -264,5 +263,8 @@ module.exports = {
         },
       },
     ],
+  },
+  stats: {
+    errorDetails: true,
   },
 };
