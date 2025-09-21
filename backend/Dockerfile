@@ -24,13 +24,22 @@ RUN dotnet publish Jellyfin.Server/Jellyfin.Server.csproj \
 # Build frontend with Bun
 # ---------------------------
 FROM oven/bun:1 AS frontend-build
+
+# Install Git and other system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy lockfile + package.json
-COPY frontend/package.json frontend/bun.lockb* ./
+COPY frontend/package.json frontend/bun.lock ./
 
-# Install deps (production only if you don’t need dev)
+# Install deps (production only if you don't need dev)
 RUN bun install --frozen-lockfile
+
+# Install CLDR data required by globalize package
+RUN bun add cldr-data
 
 # Copy source
 COPY frontend/ .
