@@ -16,10 +16,13 @@ namespace Jellyfin.Database.Implementations.Entities
         None,
         SixHours,
         TwelveHours,
+        Daily,
         Weekly,
         Monthly,
+        Quarterly,
         Yearly,
-        Lifetime
+        Lifetime,
+        Custom
     }
 
     /// <summary>

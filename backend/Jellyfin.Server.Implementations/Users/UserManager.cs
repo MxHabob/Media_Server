@@ -379,12 +379,87 @@ namespace Jellyfin.Server.Implementations.Users
             {
                 SubscriptionType.SixHours => DateTime.UtcNow.AddHours(6),
                 SubscriptionType.TwelveHours => DateTime.UtcNow.AddHours(12),
+                SubscriptionType.Daily => DateTime.UtcNow.AddDays(1),
                 SubscriptionType.Weekly => DateTime.UtcNow.AddDays(7),
                 SubscriptionType.Monthly => DateTime.UtcNow.AddMonths(1),
+                SubscriptionType.Quarterly => DateTime.UtcNow.AddMonths(3),
                 SubscriptionType.Yearly => DateTime.UtcNow.AddYears(1),
                 SubscriptionType.Lifetime => null,
                 _ => null
             };
+        }
+
+        /// <summary>
+        /// Creates a user with a subscription configuration.
+        /// </summary>
+        /// <param name="name">The username.</param>
+        /// <param name="pin">The PIN code.</param>
+        /// <param name="configuration">The subscription configuration.</param>
+        /// <param name="expirationDate">The expiration date.</param>
+        /// <returns>The created user.</returns>
+        public async Task<User> CreateUserWithSubscriptionAsync(string name, string pin, SubscriptionConfiguration configuration, DateTime? expirationDate)
+        {
+            ThrowIfInvalidUsername(name);
+
+            var dbContext = await _dbProvider.CreateDbContextAsync().ConfigureAwait(false);
+            await using (dbContext.ConfigureAwait(false))
+            {
+                var user = await CreateUserInternalAsync(name, dbContext, pin, configuration.SubscriptionType).ConfigureAwait(false);
+                user.ExpirationDate = expirationDate;
+                
+                // Apply configuration settings
+                user.MaxActiveSessions = configuration.MaxConcurrentSessions;
+                
+                if (configuration.MaxParentalRating.HasValue)
+                {
+                    user.MaxParentalRatingScore = configuration.MaxParentalRating.Value;
+                }
+                
+                if (configuration.MaxBitrate.HasValue)
+                {
+                    user.RemoteClientBitrateLimit = configuration.MaxBitrate.Value;
+                }
+
+                // Set permissions based on configuration
+                if (!configuration.AllowRemoteAccess)
+                {
+                    user.RemovePermission(PermissionKind.EnableRemoteAccess);
+                }
+                else
+                {
+                    user.AddPermission(PermissionKind.EnableRemoteAccess);
+                }
+
+                if (!configuration.AllowDownload)
+                {
+                    user.RemovePermission(PermissionKind.EnableContentDownloading);
+                }
+                else
+                {
+                    user.AddPermission(PermissionKind.EnableContentDownloading);
+                }
+
+                if (!configuration.AllowSyncPlay)
+                {
+                    user.SyncPlayAccess = SyncPlayUserAccessType.None;
+                }
+                else
+                {
+                    user.SyncPlayAccess = SyncPlayUserAccessType.CreateAndJoinGroups;
+                }
+
+                await CreateUserInternalAsync(dbContext, user).ConfigureAwait(false);
+                await dbContext.SaveChangesAsync().ConfigureAwait(false);
+
+                _users[user.Id] = user;
+                _usersByName[user.Username] = user;
+
+                var eventArgs = new UserCreatedEventArgs(user);
+                await _eventManager.PublishAsync(eventArgs).ConfigureAwait(false);
+                OnUserCreated?.Invoke(this, eventArgs);
+
+                return user;
+            }
         }
 
         /// <inheritdoc/>

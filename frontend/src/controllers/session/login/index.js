@@ -181,50 +181,26 @@ function showPinForm(context, showCancel) { // New function
 }
 
 function loadUserList(context, apiClient, users) {
-    let html = '';
-
-    for (const user of users) {
-        // TODO move card creation code to Card component
-        let cssClass = 'card squareCard scalableCard squareCard-scalable';
-
-        if (layoutManager.tv) {
-            cssClass += ' show-focus';
-
-            if (enableFocusTransform) {
-                cssClass += ' show-animation';
-            }
-        }
-
-        const cardBoxCssClass = 'cardBox cardBox-bottompadded';
-        html += '<button type="button" class="' + cssClass + '">';
-        html += '<div class="' + cardBoxCssClass + '">';
-        html += '<div class="cardScalable">';
-        html += '<div class="cardPadder cardPadder-square"></div>';
-        html += `<div class="cardContent" data-haspw="${user.HasPassword}" data-username="${user.Name}" data-userid="${user.Id}">`;
-        let imgUrl;
-
+    const html = users.map(function (user) {
+        let avatarHtml = '';
+        
         if (user.PrimaryImageTag) {
-            imgUrl = apiClient.getUserImageUrl(user.Id, {
+            const imgUrl = apiClient.getUserImageUrl(user.Id, {
                 width: 300,
                 tag: user.PrimaryImageTag,
                 type: 'Primary'
             });
-
-            html += '<div class="cardImageContainer coveredImage" style="background-image:url(\'' + imgUrl + "');\"></div>";
+            avatarHtml = `<div class="user-avatar" style="background-image: url('${imgUrl}'); background-size: cover; background-position: center;"></div>`;
         } else {
-            html += `<div class="cardImage flex align-items-center justify-content-center ${getDefaultBackgroundClass()}">`;
-            html += '<span class="material-icons cardImageIcon person" aria-hidden="true"></span>';
-            html += '</div>';
+            const initials = user.Name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+            avatarHtml = `<div class="user-avatar">${initials}</div>`;
         }
 
-        html += '</div>';
-        html += '</div>';
-        html += '<div class="cardFooter visualCardBox-cardFooter">';
-        html += '<div class="cardText singleCardText cardTextCentered">' + user.Name + '</div>';
-        html += '</div>';
-        html += '</div>';
-        html += '</button>';
-    }
+        return `<div class="user-card" data-userid="${user.Id}" data-username="${user.Name}" data-haspw="${user.HasPassword}">
+            ${avatarHtml}
+            <div class="user-name">${user.Name}</div>
+        </div>`;
+    }).join('');
 
     context.querySelector('#divUsers').innerHTML = html;
 }
@@ -253,26 +229,66 @@ export default function (view, params) {
     }
 
     function showVisualForm() {
-        view.querySelector('.visualLoginForm').classList.remove('hide');
-        view.querySelector('.manualLoginForm').classList.add('hide');
-        view.querySelector('.pinLoginForm').classList.add('hide'); // Hide PIN form
-        view.querySelector('.btnManual').classList.remove('hide');
-        view.querySelector('.btnPin').classList.remove('hide'); // Show PIN toggle
+        // Hide all forms
+        view.querySelectorAll('.login-form').forEach(form => form.classList.remove('active'));
+        // Show visual form
+        view.querySelector('.visual-login-form').classList.add('active');
+        // Update method tabs
+        view.querySelectorAll('.method-tab').forEach(tab => tab.classList.remove('active'));
+        view.querySelector('[data-method="visual"]').classList.add('active');
 
         import('../../../components/autoFocuser').then(({ default: autoFocuser }) => {
             autoFocuser.autoFocus(view);
         });
     }
 
-    view.querySelector('#divUsers').addEventListener('click', function (e) {
-        const card = dom.parentWithClass(e.target, 'card');
-        const cardContent = card ? card.querySelector('.cardContent') : null;
+    function showManualForm(context, focusUsername = false, focusPassword = false) {
+        // Hide all forms
+        view.querySelectorAll('.login-form').forEach(form => form.classList.remove('active'));
+        // Show manual form
+        view.querySelector('.manual-login-form').classList.add('active');
+        // Update method tabs
+        view.querySelectorAll('.method-tab').forEach(tab => tab.classList.remove('active'));
+        view.querySelector('[data-method="manual"]').classList.add('active');
 
-        if (cardContent) {
+        if (focusUsername) {
+            context.querySelector('#txtManualName').focus();
+        } else if (focusPassword) {
+            context.querySelector('#txtManualPassword').focus();
+        }
+    }
+
+    function showPinForm() {
+        // Hide all forms
+        view.querySelectorAll('.login-form').forEach(form => form.classList.remove('active'));
+        // Show PIN form
+        view.querySelector('.pin-login-form').classList.add('active');
+        // Update method tabs
+        view.querySelectorAll('.method-tab').forEach(tab => tab.classList.remove('active'));
+        view.querySelector('[data-method="pin"]').classList.add('active');
+
+        // Focus PIN input
+        view.querySelector('#txtPin').focus();
+    }
+
+    function showQuickConnectForm() {
+        // Hide all forms
+        view.querySelectorAll('.login-form').forEach(form => form.classList.remove('active'));
+        // Show quick connect form
+        view.querySelector('.quick-connect-form').classList.add('active');
+        // Update method tabs
+        view.querySelectorAll('.method-tab').forEach(tab => tab.classList.remove('active'));
+        view.querySelector('[data-method="quick"]').classList.add('active');
+    }
+
+    view.querySelector('#divUsers').addEventListener('click', function (e) {
+        const userCard = dom.parentWithClass(e.target, 'user-card');
+
+        if (userCard) {
             const context = view;
-            const id = cardContent.getAttribute('data-userid');
-            const name = cardContent.getAttribute('data-username');
-            const haspw = cardContent.getAttribute('data-haspw');
+            const id = userCard.getAttribute('data-userid');
+            const name = userCard.getAttribute('data-username');
+            const haspw = userCard.getAttribute('data-haspw');
 
             if (id === 'manual') {
                 context.querySelector('#txtManualName').value = '';
@@ -300,6 +316,27 @@ export default function (view, params) {
     view.querySelector('.btnForgotPassword').addEventListener('click', function () {
         Dashboard.navigate('forgotpassword');
     });
+    // Method tab event listeners
+    view.querySelectorAll('.method-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const method = this.getAttribute('data-method');
+            switch(method) {
+                case 'visual':
+                    showVisualForm();
+                    break;
+                case 'manual':
+                    showManualForm(view, true);
+                    break;
+                case 'pin':
+                    showPinForm();
+                    break;
+                case 'quick':
+                    showQuickConnectForm();
+                    break;
+            }
+        });
+    });
+
     view.querySelector('.btnCancel').addEventListener('click', showVisualForm);
     view.querySelector('.btnCancelPin').addEventListener('click', showVisualForm); // New event listener
     view.querySelector('.btnQuick').addEventListener('click', function () {

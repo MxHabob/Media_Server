@@ -1,0 +1,655 @@
+<div id="subscriptionsPage" data-role="page" class="page">
+    <div class="content-primary">
+        <div class="pageHeader">
+            <h1 class="pageTitle">Subscription Management</h1>
+            <p class="pageSubtitle">Manage subscription configurations and user subscriptions</p>
+        </div>
+
+        <!-- Subscription Statistics -->
+        <div class="subscription-stats">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="md-icon">people</i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="totalActiveSubscriptions">0</div>
+                        <div class="stat-label">Active Subscriptions</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="md-icon">warning</i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="totalExpiredSubscriptions">0</div>
+                        <div class="stat-label">Expired Subscriptions</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="md-icon">all_inclusive</i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="totalLifetimeSubscriptions">0</div>
+                        <div class="stat-label">Lifetime Subscriptions</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="md-icon">attach_money</i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="totalRevenue">$0</div>
+                        <div class="stat-label">Total Revenue</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="subscription-actions">
+            <button class="btn-primary" id="btnCreateConfiguration">
+                <i class="md-icon">add</i>
+                <span>Create Configuration</span>
+            </button>
+            <button class="btn-secondary" id="btnCreateUser">
+                <i class="md-icon">person_add</i>
+                <span>Create User with Subscription</span>
+            </button>
+            <button class="btn-secondary" id="btnBulkOperations">
+                <i class="md-icon">batch_prediction</i>
+                <span>Bulk Operations</span>
+            </button>
+            <button class="btn-secondary" id="btnExportData">
+                <i class="md-icon">download</i>
+                <span>Export Data</span>
+            </button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="subscription-tabs">
+            <button class="tab-button active" data-tab="configurations">
+                <i class="md-icon">settings</i>
+                <span>Configurations</span>
+            </button>
+            <button class="tab-button" data-tab="users">
+                <i class="md-icon">people</i>
+                <span>Users</span>
+            </button>
+            <button class="tab-button" data-tab="expiring">
+                <i class="md-icon">schedule</i>
+                <span>Expiring Soon</span>
+            </button>
+            <button class="tab-button" data-tab="analytics">
+                <i class="md-icon">analytics</i>
+                <span>Analytics</span>
+            </button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Configurations Tab -->
+            <div class="tab-panel active" id="configurations-tab">
+                <div class="panel-header">
+                    <h2>Subscription Configurations</h2>
+                    <div class="panel-actions">
+                        <input type="text" class="search-input" id="configSearch" placeholder="Search configurations...">
+                        <select class="filter-select" id="configFilter">
+                            <option value="all">All Configurations</option>
+                            <option value="active">Active Only</option>
+                            <option value="inactive">Inactive Only</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="configurations-list" id="configurationsList">
+                    <!-- Configurations will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Users Tab -->
+            <div class="tab-panel" id="users-tab">
+                <div class="panel-header">
+                    <h2>Users with Subscriptions</h2>
+                    <div class="panel-actions">
+                        <input type="text" class="search-input" id="userSearch" placeholder="Search users...">
+                        <select class="filter-select" id="userFilter">
+                            <option value="all">All Users</option>
+                            <option value="active">Active Subscriptions</option>
+                            <option value="expired">Expired Subscriptions</option>
+                            <option value="lifetime">Lifetime Subscriptions</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="users-list" id="usersList">
+                    <!-- Users will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Expiring Soon Tab -->
+            <div class="tab-panel" id="expiring-tab">
+                <div class="panel-header">
+                    <h2>Expiring Subscriptions</h2>
+                    <div class="panel-actions">
+                        <select class="filter-select" id="expiringFilter">
+                            <option value="24">Next 24 Hours</option>
+                            <option value="72">Next 3 Days</option>
+                            <option value="168">Next Week</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="expiring-list" id="expiringList">
+                    <!-- Expiring users will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div class="tab-panel" id="analytics-tab">
+                <div class="panel-header">
+                    <h2>Subscription Analytics</h2>
+                </div>
+                <div class="analytics-content">
+                    <div class="analytics-charts">
+                        <div class="chart-container">
+                            <h3>Subscriptions by Type</h3>
+                            <div class="chart" id="subscriptionsByTypeChart"></div>
+                        </div>
+                        <div class="chart-container">
+                            <h3>Revenue Over Time</h3>
+                            <div class="chart" id="revenueChart"></div>
+                        </div>
+                    </div>
+                    <div class="analytics-summary">
+                        <h3>Summary</h3>
+                        <div class="summary-grid" id="analyticsSummary">
+                            <!-- Summary data will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Configuration Modal -->
+<div id="configurationModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="configurationModalTitle">Create Configuration</h2>
+            <button class="modal-close" id="closeConfigurationModal">
+                <i class="md-icon">close</i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="configurationForm">
+                <div class="form-group">
+                    <label for="configName">Name</label>
+                    <input type="text" id="configName" required>
+                </div>
+                <div class="form-group">
+                    <label for="configDescription">Description</label>
+                    <textarea id="configDescription" rows="3"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="configType">Subscription Type</label>
+                        <select id="configType" required>
+                            <option value="0">None</option>
+                            <option value="1">6 Hours</option>
+                            <option value="2">12 Hours</option>
+                            <option value="3">Daily</option>
+                            <option value="4">Weekly</option>
+                            <option value="5">Monthly</option>
+                            <option value="6">Quarterly</option>
+                            <option value="7">Yearly</option>
+                            <option value="8">Lifetime</option>
+                            <option value="9">Custom</option>
+                        </select>
+                    </div>
+                    <div class="form-group" id="customDurationGroup" style="display: none;">
+                        <label for="customDuration">Custom Duration (Hours)</label>
+                        <input type="number" id="customDuration" min="1" max="8760">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="maxSessions">Max Concurrent Sessions</label>
+                        <input type="number" id="maxSessions" min="1" max="10" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="maxBitrate">Max Bitrate (kbps)</label>
+                        <input type="number" id="maxBitrate" min="100" max="100000">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="maxParentalRating">Max Parental Rating</label>
+                        <input type="number" id="maxParentalRating" min="0" max="18">
+                    </div>
+                    <div class="form-group">
+                        <label for="sortOrder">Sort Order</label>
+                        <input type="number" id="sortOrder" value="0">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="price">Price</label>
+                        <input type="number" id="price" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="currency">Currency</label>
+                        <input type="text" id="currency" maxlength="3" placeholder="USD">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="allowRemoteAccess">
+                        <span class="checkmark"></span>
+                        Allow Remote Access
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="allowTranscoding" checked>
+                        <span class="checkmark"></span>
+                        Allow Transcoding
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="allowDownload">
+                        <span class="checkmark"></span>
+                        Allow Download
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="allowSyncPlay">
+                        <span class="checkmark"></span>
+                        Allow Sync Play
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="isActive" checked>
+                        <span class="checkmark"></span>
+                        Active
+                    </label>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" id="cancelConfiguration">Cancel</button>
+            <button class="btn-primary" id="saveConfiguration">Save Configuration</button>
+        </div>
+    </div>
+</div>
+
+<!-- User Creation Modal -->
+<div id="userModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Create User with Subscription</h2>
+            <button class="modal-close" id="closeUserModal">
+                <i class="md-icon">close</i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <form id="userForm">
+                <div class="form-group">
+                    <label for="userName">Username</label>
+                    <input type="text" id="userName" required>
+                </div>
+                <div class="form-group">
+                    <label for="userConfiguration">Subscription Configuration</label>
+                    <select id="userConfiguration" required>
+                        <!-- Options will be loaded dynamically -->
+                    </select>
+                </div>
+                <div class="form-group" id="customDurationUserGroup" style="display: none;">
+                    <label for="customDurationUser">Custom Duration (Hours)</label>
+                    <input type="number" id="customDurationUser" min="1" max="8760">
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" id="cancelUser">Cancel</button>
+            <button class="btn-primary" id="saveUser">Create User</button>
+        </div>
+    </div>
+</div>
+
+<!-- Styles -->
+<style>
+.subscription-stats {
+    margin-bottom: 30px;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 24px;
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 14px;
+    color: #718096;
+}
+
+.subscription-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+}
+
+.subscription-tabs {
+    display: flex;
+    background: #f7fafc;
+    border-radius: 8px;
+    padding: 4px;
+    margin-bottom: 20px;
+    gap: 4px;
+}
+
+.tab-button {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #718096;
+    font-size: 14px;
+}
+
+.tab-button.active {
+    background: white;
+    color: #667eea;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tab-button:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.5);
+    color: #4a5568;
+}
+
+.tab-content {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.tab-panel {
+    display: none;
+    padding: 20px;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.panel-header h2 {
+    margin: 0;
+    font-size: 20px;
+    color: #2d3748;
+}
+
+.panel-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.search-input, .filter-select {
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.search-input {
+    width: 200px;
+}
+
+.filter-select {
+    width: 150px;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 18px;
+    color: #2d3748;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: #718096;
+    padding: 4px;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 500;
+    color: #2d3748;
+    margin-bottom: 6px;
+    font-size: 14px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-weight: normal;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+}
+
+.btn-primary, .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-secondary {
+    background: #f7fafc;
+    color: #4a5568;
+    border: 1px solid #e2e8f0;
+}
+
+.btn-secondary:hover {
+    background: #edf2f7;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .stat-card,
+    .tab-content {
+        background: #2d3748;
+        color: #e2e8f0;
+    }
+
+    .stat-number {
+        color: #e2e8f0;
+    }
+
+    .stat-label {
+        color: #a0aec0;
+    }
+
+    .panel-header h2 {
+        color: #e2e8f0;
+    }
+
+    .modal-content {
+        background: #2d3748;
+        color: #e2e8f0;
+    }
+
+    .modal-header h2 {
+        color: #e2e8f0;
+    }
+
+    .form-group label {
+        color: #e2e8f0;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        background: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+        border-color: #90cdf4;
+    }
+}
+</style>
