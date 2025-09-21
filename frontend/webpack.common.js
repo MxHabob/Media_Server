@@ -63,11 +63,11 @@ const config = {
             path.resolve(__dirname, 'node_modules')
         ],
         // FIXED: Use safe resolution that won't break if cldrjs is not installed
-        fallback: {
-            "cldr": tryResolve("cldrjs"),
-            "cldr/event": tryResolve("cldrjs/dist/event"),
-            "cldr/supplemental": tryResolve("cldrjs/dist/supplemental")
-        }
+       alias: {
+  "cldr": require.resolve("cldrjs"),
+  "cldr/event": require.resolve("cldrjs/dist/event"),
+  "cldr/supplemental": require.resolve("cldrjs/dist/supplemental")
+}
     },
     plugins: [
         new DefinePlugin({
