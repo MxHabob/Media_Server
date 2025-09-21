@@ -8,6 +8,15 @@ const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const { DefinePlugin, IgnorePlugin } = require('webpack');
 const packageJson = require('./package.json');
 
+// Add this helper function to safely resolve modules
+function tryResolve(moduleName) {
+    try {
+        return require.resolve(moduleName);
+    } catch (e) {
+        return false;
+    }
+}
+
 const Assets = [
     'native-promise-only/npo.js',
     'libarchive.js/dist/worker-bundle.js',
@@ -53,11 +62,11 @@ const config = {
             path.resolve(__dirname, 'src'),
             path.resolve(__dirname, 'node_modules')
         ],
-        // ADD THIS SECTION TO FIX THE CLDR ISSUE
+        // FIXED: Use safe resolution that won't break if cldrjs is not installed
         fallback: {
-            "cldr": require.resolve("cldrjs"),
-            "cldr/event": require.resolve("cldrjs/dist/event"),
-            "cldr/supplemental": require.resolve("cldrjs/dist/supplemental")
+            "cldr": tryResolve("cldrjs"),
+            "cldr/event": tryResolve("cldrjs/dist/event"),
+            "cldr/supplemental": tryResolve("cldrjs/dist/supplemental")
         }
     },
     plugins: [
