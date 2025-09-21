@@ -13,6 +13,7 @@ using Jellyfin.Server.Implementations.Devices;
 using Jellyfin.Server.Implementations.Events;
 using Jellyfin.Server.Implementations.Extensions;
 using Jellyfin.Server.Implementations.Security;
+using Jellyfin.Server.Implementations.Subscriptions;
 using Jellyfin.Server.Implementations.Trickplay;
 using Jellyfin.Server.Implementations.Users;
 using MediaBrowser.Controller;
@@ -81,6 +82,7 @@ namespace Jellyfin.Server
 
             serviceCollection.AddSingleton<IActivityManager, ActivityManager>();
             serviceCollection.AddSingleton<IUserManager, UserManager>();
+            serviceCollection.AddSingleton<ISubscriptionManager, SubscriptionManager>();
             serviceCollection.AddSingleton<IAuthenticationProvider, DefaultAuthenticationProvider>();
             serviceCollection.AddSingleton<IAuthenticationProvider, InvalidAuthProvider>();
             serviceCollection.AddSingleton<IPasswordResetProvider, DefaultPasswordResetProvider>();

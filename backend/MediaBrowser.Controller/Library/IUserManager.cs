@@ -83,6 +83,16 @@ namespace MediaBrowser.Controller.Library
         Task<User> CreateUserAsync(string name);
 
         /// <summary>
+        /// Creates a user with subscription configuration.
+        /// </summary>
+        /// <param name="name">The name.</param>
+        /// <param name="pin">The PIN.</param>
+        /// <param name="configuration">The subscription configuration.</param>
+        /// <param name="expirationDate">The expiration date.</param>
+        /// <returns>The created user.</returns>
+        Task<User> CreateUserWithSubscriptionAsync(string name, string pin, SubscriptionConfiguration configuration, DateTime? expirationDate);
+
+        /// <summary>
         /// Deletes the specified user.
         /// </summary>
         /// <param name="userId">The id of the user to be deleted.</param>

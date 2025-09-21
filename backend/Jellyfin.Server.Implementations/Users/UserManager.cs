@@ -421,23 +421,8 @@ namespace Jellyfin.Server.Implementations.Users
                 }
 
                 // Set permissions based on configuration
-                if (!configuration.AllowRemoteAccess)
-                {
-                    user.RemovePermission(PermissionKind.EnableRemoteAccess);
-                }
-                else
-                {
-                    user.AddPermission(PermissionKind.EnableRemoteAccess);
-                }
-
-                if (!configuration.AllowDownload)
-                {
-                    user.RemovePermission(PermissionKind.EnableContentDownloading);
-                }
-                else
-                {
-                    user.AddPermission(PermissionKind.EnableContentDownloading);
-                }
+                user.SetPermission(PermissionKind.EnableRemoteAccess, configuration.AllowRemoteAccess);
+                user.SetPermission(PermissionKind.EnableContentDownloading, configuration.AllowDownload);
 
                 if (!configuration.AllowSyncPlay)
                 {
@@ -448,15 +433,13 @@ namespace Jellyfin.Server.Implementations.Users
                     user.SyncPlayAccess = SyncPlayUserAccessType.CreateAndJoinGroups;
                 }
 
-                await CreateUserInternalAsync(dbContext, user).ConfigureAwait(false);
+                dbContext.Users.Add(user);
                 await dbContext.SaveChangesAsync().ConfigureAwait(false);
 
                 _users[user.Id] = user;
-                _usersByName[user.Username] = user;
 
                 var eventArgs = new UserCreatedEventArgs(user);
                 await _eventManager.PublishAsync(eventArgs).ConfigureAwait(false);
-                OnUserCreated?.Invoke(this, eventArgs);
 
                 return user;
             }

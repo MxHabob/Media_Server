@@ -13,15 +13,54 @@ namespace Jellyfin.Database.Implementations.Entities
     /// </summary>
     public enum SubscriptionType
     {
+        /// <summary>
+        /// No subscription.
+        /// </summary>
         None,
+
+        /// <summary>
+        /// Six hour subscription.
+        /// </summary>
         SixHours,
+
+        /// <summary>
+        /// Twelve hour subscription.
+        /// </summary>
         TwelveHours,
+
+        /// <summary>
+        /// Daily subscription.
+        /// </summary>
         Daily,
+
+        /// <summary>
+        /// Weekly subscription.
+        /// </summary>
         Weekly,
+
+        /// <summary>
+        /// Monthly subscription.
+        /// </summary>
         Monthly,
+
+        /// <summary>
+        /// Quarterly subscription.
+        /// </summary>
         Quarterly,
+
+        /// <summary>
+        /// Yearly subscription.
+        /// </summary>
         Yearly,
+
+        /// <summary>
+        /// Lifetime subscription.
+        /// </summary>
         Lifetime,
+
+        /// <summary>
+        /// Custom duration subscription.
+        /// </summary>
         Custom
     }
 

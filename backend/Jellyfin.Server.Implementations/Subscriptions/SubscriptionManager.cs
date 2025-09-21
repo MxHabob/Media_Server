@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using Jellyfin.Data;
+using Jellyfin.Database.Implementations;
 using Jellyfin.Database.Implementations.Entities;
-using Jellyfin.Server.Implementations.Data;
+using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Dto;
 using Microsoft.EntityFrameworkCore;
@@ -384,24 +386,9 @@ namespace Jellyfin.Server.Implementations.Subscriptions
                 user.RemoteClientBitrateLimit = configuration.MaxBitrate.Value;
             }
 
-            // Set permissions based on configuration
-            if (!configuration.AllowRemoteAccess)
-            {
-                user.RemovePermission(PermissionKind.EnableRemoteAccess);
-            }
-            else
-            {
-                user.AddPermission(PermissionKind.EnableRemoteAccess);
-            }
-
-            if (!configuration.AllowDownload)
-            {
-                user.RemovePermission(PermissionKind.EnableContentDownloading);
-            }
-            else
-            {
-                user.AddPermission(PermissionKind.EnableContentDownloading);
-            }
+        // Set permissions based on configuration
+        user.SetPermission(PermissionKind.EnableRemoteAccess, configuration.AllowRemoteAccess);
+        user.SetPermission(PermissionKind.EnableContentDownloading, configuration.AllowDownload);
 
             if (!configuration.AllowSyncPlay)
             {

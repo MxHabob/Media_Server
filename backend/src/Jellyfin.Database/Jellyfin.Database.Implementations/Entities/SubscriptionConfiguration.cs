@@ -54,7 +54,7 @@ namespace Jellyfin.Database.Implementations.Entities
         public int MaxConcurrentSessions { get; set; } = 1;
 
         /// <summary>
-        /// Gets or sets whether remote access is allowed.
+        /// Gets or sets a value indicating whether remote access is allowed.
         /// </summary>
         public bool AllowRemoteAccess { get; set; } = false;
 
@@ -64,7 +64,7 @@ namespace Jellyfin.Database.Implementations.Entities
         public int? MaxBitrate { get; set; }
 
         /// <summary>
-        /// Gets or sets whether transcoding is allowed.
+        /// Gets or sets a value indicating whether transcoding is allowed.
         /// </summary>
         public bool AllowTranscoding { get; set; } = true;
 
@@ -74,12 +74,12 @@ namespace Jellyfin.Database.Implementations.Entities
         public int? MaxParentalRating { get; set; }
 
         /// <summary>
-        /// Gets or sets whether download is allowed.
+        /// Gets or sets a value indicating whether download is allowed.
         /// </summary>
         public bool AllowDownload { get; set; } = false;
 
         /// <summary>
-        /// Gets or sets whether sync play is allowed.
+        /// Gets or sets a value indicating whether sync play is allowed.
         /// </summary>
         public bool AllowSyncPlay { get; set; } = false;
 
@@ -95,7 +95,7 @@ namespace Jellyfin.Database.Implementations.Entities
         public string? Currency { get; set; }
 
         /// <summary>
-        /// Gets or sets whether this configuration is active.
+        /// Gets or sets a value indicating whether this configuration is active.
         /// </summary>
         public bool IsActive { get; set; }
 

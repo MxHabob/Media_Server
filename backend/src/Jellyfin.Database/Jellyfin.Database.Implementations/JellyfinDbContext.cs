@@ -84,6 +84,11 @@ public class JellyfinDbContext(DbContextOptions<JellyfinDbContext> options, ILog
     public DbSet<User> Users => Set<User>();
 
     /// <summary>
+    /// Gets the <see cref="DbSet{TEntity}"/> containing the subscription configurations.
+    /// </summary>
+    public DbSet<SubscriptionConfiguration> SubscriptionConfigurations => Set<SubscriptionConfiguration>();
+
+    /// <summary>
     /// Gets the <see cref="DbSet{TEntity}"/> containing the trickplay metadata.
     /// </summary>
     public DbSet<TrickplayInfo> TrickplayInfos => Set<TrickplayInfo>();

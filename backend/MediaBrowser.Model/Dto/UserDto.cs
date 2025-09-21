@@ -18,8 +18,7 @@ namespace MediaBrowser.Model.Dto
             Configuration = new UserConfiguration();
             Policy = new UserPolicy();
         }
-        
-        
+
         /// <summary>
         /// Gets or sets the name.
         /// </summary>
