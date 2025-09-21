@@ -11,48 +11,18 @@ COPY backend/ .
 RUN dotnet restore
 
 # Publish the application (disable strict code analysis for Docker build)
-RUN dotnet publish Jellyfin.Server/Jellyfin.Server.csproj \
-    --configuration Release \
-    --no-restore \
-    --output /app/publish \
-    --property:TreatWarningsAsErrors=false \
-    --property:GenerateDocumentationFile=false \
-    --property:RunAnalyzersDuringBuild=false \
-    --verbosity minimal
+RUN dotnet publish Jellyfin.Server/Jellyfin.Server.csproj --configuration Release --no-restore --output /app/publish --property:TreatWarningsAsErrors=false --property:GenerateDocumentationFile=false --property:RunAnalyzersDuringBuild=false --verbosity minimal
 
-# ---------------------------
-# Build frontend with Bun
-# ---------------------------
-FROM oven/bun:1 AS frontend-build
-
-# Install Git and other system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
+# Build frontend
+FROM node:20 AS frontend-build
 WORKDIR /app
-
-# Copy lockfile + package.json
-COPY frontend/package.json frontend/bun.lock ./
-
-# Install deps (production only if you don't need dev)
-RUN bun install --frozen-lockfile
-
-# Install CLDR data required by globalize package
-RUN bun add cldr-data
-
-# Copy source
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm install
 COPY frontend/ .
-
-# Optional: copy git metadata if required
 COPY .git/ ./.git/
+RUN npm run build:production
 
-# Run production build
-RUN bun run build:production
-
-# ---------------------------
 # Runtime stage
-# ---------------------------
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 
 # Install required packages for media processing
@@ -60,28 +30,30 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
+# Set working directory
 WORKDIR /app
 
-# Copy published backend
+# Copy published application
 COPY --from=build /app/publish .
 
 # Copy built frontend
-COPY --from=frontend-build /app/dist /app/jellyfin-web
+COPY --from=frontend-build /app/dist /app/frontend
 
-# Create config + cache dirs
+# Create directories for config and cache
 RUN mkdir -p /config /cache
 
-# Expose Jellyfin ports
+# Expose the standard Jellyfin ports
 EXPOSE 8096
 EXPOSE 8920
 
-# Environment
-ENV JELLYFIN_FFmpegPath=/usr/bin/ffmpeg \
-    JELLYFIN_ServiceName=jellyfin \
-    JELLYFIN_DataDir=/config \
-    JELLYFIN_CacheDir=/cache \
-    JELLYFIN_LogDir=/config/log \
-    JELLYFIN_WebDir=/app/jellyfin-web \
-    JELLYFIN_HOST_WEB_CLIENT=true
+# Set environment variables
+ENV JELLYFIN_FFmpegPath=/usr/bin/ffmpeg
+ENV JELLYFIN_ServiceName=jellyfin
+ENV JELLYFIN_DataDir=/config
+ENV JELLYFIN_CacheDir=/cache
+ENV JELLYFIN_LogDir=/config/log
+ENV JELLYFIN_WebDir=/app/frontend
+ENV JELLYFIN_HOST_WEB_CLIENT=true
 
+# Run the application
 ENTRYPOINT ["dotnet", "jellyfin.dll"]
