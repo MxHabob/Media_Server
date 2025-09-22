@@ -9,8 +9,8 @@ services:
       - media-server-cache:/cache
       - /home/mohamed/media:/media
     ports:
-      - "8096:8096"   # HTTP (includes web client)
-      - "8920:8920"   # HTTPS (includes web client)
+      - "8096:8096"
+      - "8920:8920"
     restart: unless-stopped
     environment:
       - JELLYFIN_PublishedServerUrl=http://${MEDIA_SERVER_HOST:-localhost}
@@ -26,6 +26,11 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - media-server-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   media-server-network:
