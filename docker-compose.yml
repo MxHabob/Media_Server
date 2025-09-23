@@ -39,3 +39,4 @@ networks:
 volumes:
   media-server-config:
   media-server-cache:
+  
