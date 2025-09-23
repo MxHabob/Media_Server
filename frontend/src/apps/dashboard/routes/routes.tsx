@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, RouteObject } from 'react-router-dom';
 
 import ConnectionRequired from 'components/ConnectionRequired';
-import { ASYNC_ADMIN_PIN_ROUTES, ASYNC_ADMIN_ROUTES } from './_asyncRoutes';
+import { ASYNC_ADMIN_ROUTES } from './_asyncRoutes';
 import { toAsyncPageRoute } from 'components/router/AsyncRoute';
 import { toViewManagerPageRoute } from 'components/router/LegacyRoute';
 import { LEGACY_ADMIN_ROUTES } from './_legacyRoutes';
@@ -26,7 +26,6 @@ export const DASHBOARD_APP_ROUTES: RouteObject[] = [
                         path: DASHBOARD_APP_PATHS.Dashboard,
                         children: [
                             ...ASYNC_ADMIN_ROUTES.map(toAsyncPageRoute),
-                            ...ASYNC_ADMIN_PIN_ROUTES.map(toAsyncPageRoute),
                             ...LEGACY_ADMIN_ROUTES.map(toViewManagerPageRoute),
                             {
                                 path: 'plugins/catalog',

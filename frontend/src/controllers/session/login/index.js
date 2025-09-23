@@ -48,34 +48,6 @@ function authenticateUserByName(page, apiClient, url, username, password) {
     });
 }
 
-function authenticateUserByPin(page, apiClient, url, pin) { // New function
-    loading.show();
-    // Call the same shape as AuthenticateByName: expect AuthenticationResult
-    apiClient.ajax({
-        type: 'POST',
-        url: apiClient.getUrl('/Users/AuthenticateWithPin'),
-        data: JSON.stringify({ Pin: pin }),
-        contentType: 'application/json'
-    }, true).then(res => res.json()).then(function (result) {
-        const user = result.User;
-        loading.hide();
-        onLoginSuccessful(user.Id, result.AccessToken, apiClient, url);
-    }, function (response) {
-        page.querySelector('#txtPin').value = '';
-        loading.hide();
-
-        const UnauthorizedOrForbidden = [401, 403];
-        if (UnauthorizedOrForbidden.includes(response.status)) {
-            toast(globalize.translate('MessageInvalidPinOrExpired')); // New localization key
-        } else {
-            Dashboard.alert({
-                message: globalize.translate('MessageUnableToConnectToServer'),
-                title: globalize.translate('HeaderConnectionFailure')
-            });
-        }
-    });
-}
-
 function authenticateQuickConnect(apiClient, targetUrl) {
     const url = apiClient.getUrl('/QuickConnect/Initiate');
     apiClient.ajax({ type: 'POST', url }, true).then(res => res.json()).then(function (json) {
@@ -148,7 +120,6 @@ function onLoginSuccessful(id, accessToken, apiClient, url) {
 function showManualForm(context, showCancel, focusPassword) {
     context.querySelector('.chkRememberLogin').checked = appSettings.enableAutoLogin();
     context.querySelector('.manualLoginForm').classList.remove('hide');
-    context.querySelector('.pinLoginForm').classList.add('hide'); // Hide PIN form
     context.querySelector('.visualLoginForm').classList.add('hide');
     context.querySelector('.btnManual').classList.add('hide');
 
@@ -165,42 +136,51 @@ function showManualForm(context, showCancel, focusPassword) {
     }
 }
 
-function showPinForm(context, showCancel) { // New function
-    context.querySelector('.pinLoginForm').classList.remove('hide');
-    context.querySelector('.manualLoginForm').classList.add('hide');
-    context.querySelector('.visualLoginForm').classList.add('hide');
-    context.querySelector('.btnPin').classList.add('hide');
-
-    if (showCancel) {
-        context.querySelector('.btnCancelPin').classList.remove('hide');
-    } else {
-        context.querySelector('.btnCancelPin').classList.add('hide');
-    }
-
-    context.querySelector('#txtPin').focus();
-}
-
 function loadUserList(context, apiClient, users) {
-    const html = users.map(function (user) {
-        let avatarHtml = '';
-        
+    let html = '';
+
+    for (const user of users) {
+        // TODO move card creation code to Card component
+        let cssClass = 'card squareCard scalableCard squareCard-scalable';
+
+        if (layoutManager.tv) {
+            cssClass += ' show-focus';
+
+            if (enableFocusTransform) {
+                cssClass += ' show-animation';
+            }
+        }
+
+        const cardBoxCssClass = 'cardBox cardBox-bottompadded';
+        html += '<button type="button" class="' + cssClass + '">';
+        html += '<div class="' + cardBoxCssClass + '">';
+        html += '<div class="cardScalable">';
+        html += '<div class="cardPadder cardPadder-square"></div>';
+        html += `<div class="cardContent" data-haspw="${user.HasPassword}" data-username="${user.Name}" data-userid="${user.Id}">`;
+        let imgUrl;
+
         if (user.PrimaryImageTag) {
-            const imgUrl = apiClient.getUserImageUrl(user.Id, {
+            imgUrl = apiClient.getUserImageUrl(user.Id, {
                 width: 300,
                 tag: user.PrimaryImageTag,
                 type: 'Primary'
             });
-            avatarHtml = `<div class="user-avatar" style="background-image: url('${imgUrl}'); background-size: cover; background-position: center;"></div>`;
+
+            html += '<div class="cardImageContainer coveredImage" style="background-image:url(\'' + imgUrl + "');\"></div>";
         } else {
-            const initials = user.Name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-            avatarHtml = `<div class="user-avatar">${initials}</div>`;
+            html += `<div class="cardImage flex align-items-center justify-content-center ${getDefaultBackgroundClass()}">`;
+            html += '<span class="material-icons cardImageIcon person" aria-hidden="true"></span>';
+            html += '</div>';
         }
 
-        return `<div class="user-card" data-userid="${user.Id}" data-username="${user.Name}" data-haspw="${user.HasPassword}">
-            ${avatarHtml}
-            <div class="user-name">${user.Name}</div>
-        </div>`;
-    }).join('');
+        html += '</div>';
+        html += '</div>';
+        html += '<div class="cardFooter visualCardBox-cardFooter">';
+        html += '<div class="cardText singleCardText cardTextCentered">' + user.Name + '</div>';
+        html += '</div>';
+        html += '</div>';
+        html += '</button>';
+    }
 
     context.querySelector('#divUsers').innerHTML = html;
 }
@@ -213,7 +193,7 @@ export default function (view, params) {
             return ServerConnections.getOrCreateApiClient(serverId);
         }
 
-        return ServerConnections.getApiClient();
+        return ApiClient;
     }
 
     function getTargetUrl() {
@@ -229,66 +209,24 @@ export default function (view, params) {
     }
 
     function showVisualForm() {
-        // Hide all forms
-        view.querySelectorAll('.login-form').forEach(form => form.classList.remove('active'));
-        // Show visual form
-        view.querySelector('.visual-login-form').classList.add('active');
-        // Update method tabs
-        view.querySelectorAll('.method-tab').forEach(tab => tab.classList.remove('active'));
-        view.querySelector('[data-method="visual"]').classList.add('active');
+        view.querySelector('.visualLoginForm').classList.remove('hide');
+        view.querySelector('.manualLoginForm').classList.add('hide');
+        view.querySelector('.btnManual').classList.remove('hide');
 
         import('../../../components/autoFocuser').then(({ default: autoFocuser }) => {
             autoFocuser.autoFocus(view);
         });
     }
 
-    function showManualForm(context, focusUsername = false, focusPassword = false) {
-        // Hide all forms
-        view.querySelectorAll('.login-form').forEach(form => form.classList.remove('active'));
-        // Show manual form
-        view.querySelector('.manual-login-form').classList.add('active');
-        // Update method tabs
-        view.querySelectorAll('.method-tab').forEach(tab => tab.classList.remove('active'));
-        view.querySelector('[data-method="manual"]').classList.add('active');
-
-        if (focusUsername) {
-            context.querySelector('#txtManualName').focus();
-        } else if (focusPassword) {
-            context.querySelector('#txtManualPassword').focus();
-        }
-    }
-
-    function showPinForm() {
-        // Hide all forms
-        view.querySelectorAll('.login-form').forEach(form => form.classList.remove('active'));
-        // Show PIN form
-        view.querySelector('.pin-login-form').classList.add('active');
-        // Update method tabs
-        view.querySelectorAll('.method-tab').forEach(tab => tab.classList.remove('active'));
-        view.querySelector('[data-method="pin"]').classList.add('active');
-
-        // Focus PIN input
-        view.querySelector('#txtPin').focus();
-    }
-
-    function showQuickConnectForm() {
-        // Hide all forms
-        view.querySelectorAll('.login-form').forEach(form => form.classList.remove('active'));
-        // Show quick connect form
-        view.querySelector('.quick-connect-form').classList.add('active');
-        // Update method tabs
-        view.querySelectorAll('.method-tab').forEach(tab => tab.classList.remove('active'));
-        view.querySelector('[data-method="quick"]').classList.add('active');
-    }
-
     view.querySelector('#divUsers').addEventListener('click', function (e) {
-        const userCard = dom.parentWithClass(e.target, 'user-card');
+        const card = dom.parentWithClass(e.target, 'card');
+        const cardContent = card ? card.querySelector('.cardContent') : null;
 
-        if (userCard) {
+        if (cardContent) {
             const context = view;
-            const id = userCard.getAttribute('data-userid');
-            const name = userCard.getAttribute('data-username');
-            const haspw = userCard.getAttribute('data-haspw');
+            const id = cardContent.getAttribute('data-userid');
+            const name = cardContent.getAttribute('data-username');
+            const haspw = cardContent.getAttribute('data-haspw');
 
             if (id === 'manual') {
                 context.querySelector('#txtManualName').value = '';
@@ -308,37 +246,10 @@ export default function (view, params) {
         e.preventDefault();
         return false;
     });
-    view.querySelector('.pinLoginForm').addEventListener('submit', function (e) { // New event listener
-        authenticateUserByPin(view, getApiClient(), getTargetUrl(), view.querySelector('#txtPin').value);
-        e.preventDefault();
-        return false;
-    });
     view.querySelector('.btnForgotPassword').addEventListener('click', function () {
         Dashboard.navigate('forgotpassword');
     });
-    // Method tab event listeners
-    view.querySelectorAll('.method-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            const method = this.getAttribute('data-method');
-            switch(method) {
-                case 'visual':
-                    showVisualForm();
-                    break;
-                case 'manual':
-                    showManualForm(view, true);
-                    break;
-                case 'pin':
-                    showPinForm();
-                    break;
-                case 'quick':
-                    showQuickConnectForm();
-                    break;
-            }
-        });
-    });
-
     view.querySelector('.btnCancel').addEventListener('click', showVisualForm);
-    view.querySelector('.btnCancelPin').addEventListener('click', showVisualForm); // New event listener
     view.querySelector('.btnQuick').addEventListener('click', function () {
         authenticateQuickConnect(getApiClient(), getTargetUrl());
         return false;
@@ -346,9 +257,6 @@ export default function (view, params) {
     view.querySelector('.btnManual').addEventListener('click', function () {
         view.querySelector('#txtManualName').value = '';
         showManualForm(view, true);
-    });
-    view.querySelector('.btnPin').addEventListener('click', function () { // New event listener
-        showPinForm(view, true);
     });
     view.querySelector('.btnSelectServer').addEventListener('click', function () {
         Dashboard.selectServer();
@@ -408,3 +316,4 @@ export default function (view, params) {
         libraryMenu.setTransparentMenu(false);
     });
 }
+

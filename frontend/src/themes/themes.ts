@@ -10,7 +10,6 @@ declare module '@mui/material/styles' {
         blueradiance: true;
         purplehaze: true;
         wmc: true;
-        elegantfin: true;
     }
 
     interface Palette {
@@ -119,25 +118,7 @@ export const COLOR_SCHEMES = {
     dark: DEFAULT_COLOR_SCHEME,
     light,
     purplehaze,
-    wmc,
-    elegantfin: buildCustomColorScheme({
-        palette: {
-            background: {
-                default: '#0f1115',
-                paper: '#1b1f2a'
-            },
-            primary: {
-                main: '#2b2d42'
-            },
-            text: {
-                primary: '#e5e7eb',
-                secondary: '#a1a7b3'
-            },
-            AppBar: {
-                defaultBg: '#151822'
-            }
-        }
-    })
+    wmc
 };
 
 /** The default theme containing all color scheme variants. */

@@ -7,7 +7,7 @@ import globalize from '../lib/globalize';
 import profileBuilder from '../scripts/browserDeviceProfile';
 import { AppFeature } from 'constants/appFeature';
 
-const appName = 'media Web';
+const appName = 'Jellyfin Web';
 
 const BrowserName = {
     tizen: 'Samsung Smart TV',

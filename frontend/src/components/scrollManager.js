@@ -41,7 +41,7 @@ try {
     const opts = Object.defineProperty({}, 'behavior', {
         get: function () {
             supportsScrollToOptions = true;
-            return 'auto';
+            return null;
         }
     });
 
@@ -383,7 +383,7 @@ function scrollToHelper(scroller, options) {
      * @param {boolean} smooth - Smooth scrolling.
      */
 function builtinScroll(xScroller, scrollX, yScroller, scrollY, smooth) {
-    const scrollBehavior = smooth ? 'smooth' : 'auto';
+    const scrollBehavior = smooth ? 'smooth' : 'instant';
 
     if (xScroller !== yScroller) {
         if (xScroller) {
