@@ -13,7 +13,7 @@ RUN npm cache clean --force
 RUN npm install
 COPY frontend/ .
 COPY .git/ ./.git/
-RUN npm run build:development
+RUN npm run build:production
 RUN ls -la /app/dist/
 RUN find /app/dist/ -type f
 
