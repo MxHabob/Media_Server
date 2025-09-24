@@ -270,23 +270,34 @@ public class UserController : BaseJellyfinApiController
     {
         var auth = await _authContext.GetAuthorizationInfo(Request).ConfigureAwait(false);
         var remoteIp = HttpContext.GetNormalizedRemoteIP().ToString();
-        var user = await _userManager.AuthenticateUserByPinAsync(request.Pin, remoteIp, true).ConfigureAwait(false);
-        if (user == null)
+        try
+        {
+            var user = await _userManager.AuthenticateUserByPinAsync(request.Pin, remoteIp, true).ConfigureAwait(false);
+            if (user == null)
+            {
+                return Unauthorized("Invalid PIN or expired subscription.");
+            }
+
+            var result = await _sessionManager.AuthenticateDirect(new AuthenticationRequest
+            {
+                App = auth.Client,
+                AppVersion = auth.Version,
+                DeviceId = auth.DeviceId,
+                DeviceName = auth.Device,
+                RemoteEndPoint = remoteIp,
+                UserId = user.Id
+            }).ConfigureAwait(false);
+
+            return result;
+        }
+        catch (AuthenticationException)
         {
             return Unauthorized("Invalid PIN or expired subscription.");
         }
-
-        var result = await _sessionManager.AuthenticateNewSession(new AuthenticationRequest
+        catch (SecurityException)
         {
-            App = auth.Client,
-            AppVersion = auth.Version,
-            DeviceId = auth.DeviceId,
-            DeviceName = auth.Device,
-            RemoteEndPoint = remoteIp,
-            UserId = user.Id
-        }).ConfigureAwait(false);
-
-        return result;
+            return Unauthorized("Invalid PIN or expired subscription.");
+        }
     }
 
     /// <summary>

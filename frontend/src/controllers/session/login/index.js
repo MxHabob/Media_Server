@@ -17,6 +17,7 @@ import '../../../elements/emby-checkbox/emby-checkbox';
 import Dashboard from '../../../utils/dashboard';
 import toast from '../../../components/toast/toast';
 import dialogHelper from '../../../components/dialogHelper/dialogHelper';
+import prompt from '../../../components/prompt/prompt';
 import baseAlert from '../../../components/alert';
 import { getDefaultBackgroundClass } from '../../../components/cardbuilder/cardBuilderUtils';
 
@@ -110,6 +111,32 @@ function authenticateQuickConnect(apiClient, targetUrl) {
         console.error('Quick connect error: ', e);
         return false;
     });
+}
+
+async function authenticateWithPin(apiClient, targetUrl) {
+    const pin = await prompt({
+        title: globalize.translate('HeaderPinLogin'),
+        label: globalize.translate('MessageEnterPin'),
+        confirmText: globalize.translate('ButtonOk')
+    }).catch(() => undefined);
+
+    if (!pin) return;
+
+    try {
+        const result = await apiClient.ajax({
+            type: 'POST',
+            url: apiClient.getUrl('/Users/AuthenticateWithPin'),
+            data: JSON.stringify({ Pin: pin }),
+            contentType: 'application/json'
+        }, true).then(r => r.json());
+
+        onLoginSuccessful(result.User.Id, result.AccessToken, apiClient, targetUrl);
+    } catch (e) {
+        Dashboard.alert({
+            message: globalize.translate('MessageInvalidPin'),
+            title: globalize.translate('HeaderError')
+        });
+    }
 }
 
 function onLoginSuccessful(id, accessToken, apiClient, url) {
@@ -252,6 +279,10 @@ export default function (view, params) {
     view.querySelector('.btnCancel').addEventListener('click', showVisualForm);
     view.querySelector('.btnQuick').addEventListener('click', function () {
         authenticateQuickConnect(getApiClient(), getTargetUrl());
+        return false;
+    });
+    view.querySelector('.btnPinLogin').addEventListener('click', function () {
+        authenticateWithPin(getApiClient(), getTargetUrl());
         return false;
     });
     view.querySelector('.btnManual').addEventListener('click', function () {

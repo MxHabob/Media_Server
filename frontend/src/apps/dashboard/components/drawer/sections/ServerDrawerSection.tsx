@@ -3,6 +3,8 @@ import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import LibraryAdd from '@mui/icons-material/LibraryAdd';
 import Palette from '@mui/icons-material/Palette';
+import SubscriptionsIcon from '@mui/icons-material/Subscriptions';
+import PinIcon from '@mui/icons-material/Pin';
 import People from '@mui/icons-material/People';
 import PlayCircle from '@mui/icons-material/PlayCircle';
 import Settings from '@mui/icons-material/Settings';
@@ -82,6 +84,22 @@ const ServerDrawerSection = () => {
                 </ListItemIcon>
                 <ListItemText primary={globalize.translate('HeaderBranding')} />
             </ListItemLink>
+            <ListItem disablePadding>
+                <ListItemLink to='/dashboard/subscriptions'>
+                    <ListItemIcon>
+                        <SubscriptionsIcon />
+                    </ListItemIcon>
+                    <ListItemText primary={globalize.translate('HeaderSubscriptions')} />
+                </ListItemLink>
+            </ListItem>
+            <ListItem disablePadding>
+                <ListItemLink to='/dashboard/pins'>
+                    <ListItemIcon>
+                        <PinIcon />
+                    </ListItemIcon>
+                    <ListItemText primary={globalize.translate('HeaderPins')} />
+                </ListItemLink>
+            </ListItem>
             <ListItem disablePadding>
                 <ListItemLink to='/dashboard/users'>
                     <ListItemIcon>

@@ -1203,6 +1203,90 @@ namespace Jellyfin.Server.Implementations.Migrations
                     b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
                 });
 
+            modelBuilder.Entity("Jellyfin.Database.Implementations.Entities.SubscriptionConfiguration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("AllowDownload")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AllowRemoteAccess")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AllowSyncPlay")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AllowTranscoding")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("CustomDurationHours")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("MaxBitrate")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("MaxConcurrentSessions")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("MaxParentalRating")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Metadata")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("ModifiedByUserId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ModifiedDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SubscriptionType")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedDate");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("SubscriptionType");
+
+                    b.ToTable("SubscriptionConfigurations");
+
+                    b.HasAnnotation("Sqlite:UseSqlReturningClause", false);
+                });
+
             modelBuilder.Entity("Jellyfin.Database.Implementations.Entities.TrickplayInfo", b =>
                 {
                     b.Property<Guid>("ItemId")
@@ -1273,6 +1357,9 @@ namespace Jellyfin.Server.Implementations.Migrations
                     b.Property<bool>("EnableUserPreferenceAccess")
                         .HasColumnType("INTEGER");
 
+                    b.Property<DateTime?>("ExpirationDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("HidePlayedInLatest")
                         .HasColumnType("INTEGER");
 
@@ -1312,6 +1399,10 @@ namespace Jellyfin.Server.Implementations.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PinCode")
+                        .HasMaxLength(255)
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("PlayDefaultAudioTrack")
                         .HasColumnType("INTEGER");
 
@@ -1326,6 +1417,9 @@ namespace Jellyfin.Server.Implementations.Migrations
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SubscriptionType")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("SubtitleLanguagePreference")

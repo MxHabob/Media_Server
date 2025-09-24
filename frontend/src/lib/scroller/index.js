@@ -236,12 +236,12 @@ const scrollerFactory = function (frame, options) {
             if (o.horizontal) {
                 container.scroll({
                     left: pos,
-                    behavior: immediate ? 'instant' : 'smooth'
+                    behavior: immediate ? 'auto' : 'smooth'
                 });
             } else {
                 container.scroll({
                     top: pos,
-                    behavior: immediate ? 'instant' : 'smooth'
+                    behavior: immediate ? 'auto' : 'smooth'
                 });
             }
         } else if (!immediate && container.scrollTo) {

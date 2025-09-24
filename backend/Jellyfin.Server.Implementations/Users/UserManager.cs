@@ -247,6 +247,7 @@ namespace Jellyfin.Server.Implementations.Users
             }
 
             var pins = new List<string>();
+            var createdUsers = new List<User>();
             var dbContext = await _dbProvider.CreateDbContextAsync().ConfigureAwait(false);
             await using (dbContext.ConfigureAwait(false))
             {
@@ -262,14 +263,15 @@ namespace Jellyfin.Server.Implementations.Users
 
                     var user = await CreateUserInternalAsync(username, dbContext, pin, subscriptionType).ConfigureAwait(false);
                     dbContext.Users.Add(user);
+                    createdUsers.Add(user);
                     pins.Add(pin);
                 }
 
                 await dbContext.SaveChangesAsync().ConfigureAwait(false);
-                foreach (var pin in pins)
+                foreach (var user in createdUsers)
                 {
-                    var user = Users.First(u => u.Username.Equals($"PIN_{pin}", StringComparison.OrdinalIgnoreCase));
-                    _users.Add(user.Id, user);
+                    // Ensure the in-memory cache is populated for subsequent lookups
+                    _users[user.Id] = user;
                 }
             }
 
