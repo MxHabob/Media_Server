@@ -295,6 +295,11 @@ public class UserController : BaseJellyfinApiController
                 await Task.Delay(25).ConfigureAwait(false);
             }
 
+            if (result == null)
+            {
+                return Unauthorized("Authentication failed");
+            }
+            
             return result;
         }
         catch (AuthenticationException)
@@ -313,7 +318,7 @@ public class UserController : BaseJellyfinApiController
     /// <param name="request">The <see cref="GeneratePinsRequest"/> request containing the count and subscription type.</param>
     /// <response code="200">PINs generated successfully.</response>
     /// <response code="403">Admin access required.</response>
-    /// <returns>A <see cref="Task"/> containing a <see cref="List{string}"/> of generated PINs.</returns>
+    /// <returns>A <see cref="Task"/> containing a <see cref="List{T}"/> of generated PINs.</returns>
     [HttpPost("GeneratePins")]
     [Authorize(Policy = Policies.RequiresElevation)]
     [ProducesResponseType(StatusCodes.Status200OK)]

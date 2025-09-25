@@ -89,6 +89,16 @@ public class JellyfinDbContext(DbContextOptions<JellyfinDbContext> options, ILog
     public DbSet<SubscriptionConfiguration> SubscriptionConfigurations => Set<SubscriptionConfiguration>();
 
     /// <summary>
+    /// Gets the <see cref="DbSet{TEntity}"/> containing the PIN batches.
+    /// </summary>
+    public DbSet<PinBatch> PinBatches => Set<PinBatch>();
+
+    /// <summary>
+    /// Gets the <see cref="DbSet{TEntity}"/> containing the PIN batch users.
+    /// </summary>
+    public DbSet<PinBatchUser> PinBatchUsers => Set<PinBatchUser>();
+
+    /// <summary>
     /// Gets the <see cref="DbSet{TEntity}"/> containing the trickplay metadata.
     /// </summary>
     public DbSet<TrickplayInfo> TrickplayInfos => Set<TrickplayInfo>();

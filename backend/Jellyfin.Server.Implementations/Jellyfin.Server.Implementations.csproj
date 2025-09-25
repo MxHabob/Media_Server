@@ -30,6 +30,7 @@
     <PackageReference Include="System.Linq.Async" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" />
     <PackageReference Include="BCrypt.Net-Next" />
+    <PackageReference Include="EPPlus" />
   </ItemGroup>
 
   <ItemGroup>

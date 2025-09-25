@@ -7,6 +7,7 @@ using Jellyfin.Data;
 using Jellyfin.Database.Implementations;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
+using Jellyfin.Server.Implementations.PinGeneration;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Dto;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +23,7 @@ namespace Jellyfin.Server.Implementations.Subscriptions
         private readonly IDbContextFactory<JellyfinDbContext> _dbContextFactory;
         private readonly ILogger<SubscriptionManager> _logger;
         private readonly IUserManager _userManager;
+        private readonly PinBatchManager _pinBatchManager;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SubscriptionManager"/> class.
@@ -29,14 +31,17 @@ namespace Jellyfin.Server.Implementations.Subscriptions
         /// <param name="dbContextFactory">The database context factory.</param>
         /// <param name="logger">The logger.</param>
         /// <param name="userManager">The user manager.</param>
+        /// <param name="pinBatchManager">The PIN batch manager.</param>
         public SubscriptionManager(
             IDbContextFactory<JellyfinDbContext> dbContextFactory,
             ILogger<SubscriptionManager> logger,
-            IUserManager userManager)
+            IUserManager userManager,
+            PinBatchManager pinBatchManager)
         {
             _dbContextFactory = dbContextFactory;
             _logger = logger;
             _userManager = userManager;
+            _pinBatchManager = pinBatchManager;
         }
 
         /// <inheritdoc />
@@ -56,7 +61,7 @@ namespace Jellyfin.Server.Implementations.Subscriptions
         {
             using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
             return await dbContext.SubscriptionConfigurations
-                .FirstOrDefaultAsync(c => c.Id == id)
+                .FirstOrDefaultAsync(c => c.Id.Equals(id))
                 .ConfigureAwait(false);
         }
 
@@ -81,7 +86,7 @@ namespace Jellyfin.Server.Implementations.Subscriptions
             using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
             
             var existing = await dbContext.SubscriptionConfigurations
-                .FirstOrDefaultAsync(c => c.Id == configuration.Id)
+                .FirstOrDefaultAsync(c => c.Id.Equals(configuration.Id))
                 .ConfigureAwait(false);
             
             if (existing == null)
@@ -120,7 +125,7 @@ namespace Jellyfin.Server.Implementations.Subscriptions
             using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
             
             var configuration = await dbContext.SubscriptionConfigurations
-                .FirstOrDefaultAsync(c => c.Id == id)
+                .FirstOrDefaultAsync(c => c.Id.Equals(id))
                 .ConfigureAwait(false);
             
             if (configuration == null)
@@ -276,39 +281,39 @@ namespace Jellyfin.Server.Implementations.Subscriptions
         }
 
         /// <inheritdoc />
-        public async Task<bool> IsSubscriptionValidAsync(Guid userId)
+        public Task<bool> IsSubscriptionValidAsync(Guid userId)
         {
             var user = _userManager.GetUserById(userId);
             if (user == null)
             {
-                return false;
+                return Task.FromResult(false);
             }
 
             // Check if user has a PIN (subscription-based user)
             if (string.IsNullOrEmpty(user.PinCode))
             {
-                return true; // Regular user without subscription restrictions
+                return Task.FromResult(true); // Regular user without subscription restrictions
             }
 
             // Check expiration
             if (user.ExpirationDate.HasValue && user.ExpirationDate.Value < DateTime.UtcNow)
             {
-                return false;
+                return Task.FromResult(false);
             }
 
-            return true;
+            return Task.FromResult(true);
         }
 
         /// <inheritdoc />
-        public async Task<IEnumerable<User>> GetUsersWithExpiringSubscriptionsAsync(int hoursBeforeExpiration = 24)
+        public Task<IEnumerable<User>> GetUsersWithExpiringSubscriptionsAsync(int hoursBeforeExpiration = 24)
         {
             var expirationThreshold = DateTime.UtcNow.AddHours(hoursBeforeExpiration);
             
-            return _userManager.Users
+            return Task.FromResult(_userManager.Users
                 .Where(u => u.ExpirationDate.HasValue && 
                            u.ExpirationDate.Value <= expirationThreshold && 
                            u.ExpirationDate.Value > DateTime.UtcNow)
-                .ToList();
+                .ToList() as IEnumerable<User>);
         }
 
         /// <summary>
@@ -397,6 +402,195 @@ namespace Jellyfin.Server.Implementations.Subscriptions
             else
             {
                 user.SyncPlayAccess = SyncPlayUserAccessType.CreateAndJoinGroups;
+            }
+        }
+
+        /// <summary>
+        /// Creates a PIN batch from a subscription configuration.
+        /// </summary>
+        /// <param name="configurationId">The subscription configuration ID.</param>
+        /// <param name="batchName">The name for the new batch.</param>
+        /// <param name="batchDescription">The description for the new batch.</param>
+        /// <param name="pinCount">The number of PINs to generate.</param>
+        /// <param name="pinPattern">The PIN pattern to use.</param>
+        /// <param name="pinLength">The PIN length.</param>
+        /// <param name="createdByUserId">The ID of the user creating the batch.</param>
+        /// <param name="customCharacterSet">Custom character set for custom pattern.</param>
+        /// <param name="batchExpirationDate">Optional expiration date for the batch.</param>
+        /// <returns>The created PIN batch.</returns>
+        public async Task<PinBatch> CreatePinBatchFromSubscriptionAsync(
+            Guid configurationId,
+            string batchName,
+            string? batchDescription,
+            int pinCount,
+            PinPattern pinPattern,
+            int pinLength,
+            Guid createdByUserId,
+            string? customCharacterSet = null,
+            DateTime? batchExpirationDate = null)
+        {
+            var configuration = await GetConfigurationAsync(configurationId).ConfigureAwait(false);
+            if (configuration == null)
+            {
+                throw new InvalidOperationException($"Subscription configuration with ID {configurationId} not found.");
+            }
+
+            if (!configuration.IsActive)
+            {
+                throw new InvalidOperationException($"Subscription configuration {configuration.Name} is not active.");
+            }
+
+            // Create batch settings from configuration
+            var batchSettings = new BatchSettings
+            {
+                MaxConcurrentSessions = configuration.MaxConcurrentSessions,
+                AllowRemoteAccess = configuration.AllowRemoteAccess,
+                AllowTranscoding = configuration.AllowTranscoding,
+                AllowDownload = configuration.AllowDownload,
+                AllowSyncPlay = configuration.AllowSyncPlay,
+                MaxBitrate = configuration.MaxBitrate,
+                MaxParentalRating = configuration.MaxParentalRating,
+                Price = configuration.Price,
+                Currency = configuration.Currency,
+                Metadata = $"Created from subscription configuration: {configuration.Name}"
+            };
+
+            // Create the PIN batch
+            var batch = await _pinBatchManager.CreateBatchAsync(
+                batchName,
+                batchDescription,
+                configuration.SubscriptionType,
+                pinPattern,
+                pinLength,
+                pinCount,
+                createdByUserId,
+                customCharacterSet,
+                batchExpirationDate,
+                batchSettings).ConfigureAwait(false);
+
+            _logger.LogInformation("Created PIN batch '{BatchName}' from subscription configuration '{ConfigName}' with {PinCount} PINs", 
+                batchName, configuration.Name, pinCount);
+
+            return batch;
+        }
+
+        /// <summary>
+        /// Creates PINs for an existing subscription configuration.
+        /// </summary>
+        /// <param name="configurationId">The subscription configuration ID.</param>
+        /// <param name="pinCount">The number of PINs to generate.</param>
+        /// <param name="pinPattern">The PIN pattern to use.</param>
+        /// <param name="pinLength">The PIN length.</param>
+        /// <param name="createdByUserId">The ID of the user creating the PINs.</param>
+        /// <param name="customCharacterSet">Custom character set for custom pattern.</param>
+        /// <returns>A list of generated PINs with their metadata.</returns>
+        public async Task<List<GeneratedPinInfo>> CreatePinsForSubscriptionAsync(
+            Guid configurationId,
+            int pinCount,
+            PinPattern pinPattern,
+            int pinLength,
+            Guid createdByUserId,
+            string? customCharacterSet = null)
+        {
+            var configuration = await GetConfigurationAsync(configurationId).ConfigureAwait(false);
+            if (configuration == null)
+            {
+                throw new InvalidOperationException($"Subscription configuration with ID {configurationId} not found.");
+            }
+
+            if (!configuration.IsActive)
+            {
+                throw new InvalidOperationException($"Subscription configuration {configuration.Name} is not active.");
+            }
+
+            // Create a temporary batch for PIN generation
+            var batchName = $"Temp_{configuration.Name}_{DateTime.UtcNow:yyyyMMdd_HHmmss}";
+            var batch = await _pinBatchManager.CreateBatchAsync(
+                batchName,
+                $"Temporary batch for {configuration.Name}",
+                configuration.SubscriptionType,
+                pinPattern,
+                pinLength,
+                pinCount,
+                createdByUserId,
+                customCharacterSet,
+                null,
+                new BatchSettings
+                {
+                    MaxConcurrentSessions = configuration.MaxConcurrentSessions,
+                    AllowRemoteAccess = configuration.AllowRemoteAccess,
+                    AllowTranscoding = configuration.AllowTranscoding,
+                    AllowDownload = configuration.AllowDownload,
+                    AllowSyncPlay = configuration.AllowSyncPlay,
+                    MaxBitrate = configuration.MaxBitrate,
+                    MaxParentalRating = configuration.MaxParentalRating,
+                    Price = configuration.Price,
+                    Currency = configuration.Currency
+                }).ConfigureAwait(false);
+
+            // Get the generated PINs
+            var pins = await _pinBatchManager.GetBatchPinsAsync(batch.Id, true, true).ConfigureAwait(false);
+            
+            // Convert to GeneratedPinInfo
+            var result = pins.Select(pin => new GeneratedPinInfo
+            {
+                Pin = DecryptPin(pin.OriginalPin),
+                BatchId = batch.Id,
+                SubscriptionType = configuration.SubscriptionType,
+                ExpirationDate = pin.ExpirationDate,
+                MaxConcurrentSessions = configuration.MaxConcurrentSessions,
+                AllowRemoteAccess = configuration.AllowRemoteAccess,
+                MaxBitrate = configuration.MaxBitrate,
+                AllowTranscoding = configuration.AllowTranscoding,
+                MaxParentalRating = configuration.MaxParentalRating,
+                AllowDownload = configuration.AllowDownload,
+                AllowSyncPlay = configuration.AllowSyncPlay,
+                CreatedDate = pin.CreatedDate
+            }).ToList();
+
+            _logger.LogInformation("Generated {PinCount} PINs for subscription configuration '{ConfigName}'", 
+                pinCount, configuration.Name);
+
+            return result;
+        }
+
+        /// <summary>
+        /// Gets PIN batches associated with a subscription configuration.
+        /// </summary>
+        /// <param name="configurationId">The subscription configuration ID.</param>
+        /// <returns>A list of PIN batches.</returns>
+        public async Task<List<PinBatch>> GetPinBatchesForSubscriptionAsync(Guid configurationId)
+        {
+            var configuration = await GetConfigurationAsync(configurationId).ConfigureAwait(false);
+            if (configuration == null)
+            {
+                return new List<PinBatch>();
+            }
+
+            return await _pinBatchManager.GetBatchesAsync(
+                subscriptionType: configuration.SubscriptionType).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Decrypts a PIN from storage.
+        /// </summary>
+        /// <param name="encryptedPin">The encrypted PIN.</param>
+        /// <returns>The decrypted PIN.</returns>
+        private static string DecryptPin(string? encryptedPin)
+        {
+            if (string.IsNullOrEmpty(encryptedPin))
+            {
+                return string.Empty;
+            }
+            
+            try
+            {
+                var bytes = Convert.FromBase64String(encryptedPin);
+                return System.Text.Encoding.UTF8.GetString(bytes);
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
     }

@@ -396,6 +396,11 @@ namespace Jellyfin.Database.Implementations.Entities
         [ForeignKey("Preference_Preferences_Guid")]
         public virtual ICollection<Preference> Preferences { get; private set; }
 
+        /// <summary>
+        /// Gets or sets the PIN batch user relationship if this user was created from a PIN batch.
+        /// </summary>
+        public virtual PinBatchUser? PinBatchUser { get; set; }
+
         /// <inheritdoc/>
         public void OnSavingChanges()
         {

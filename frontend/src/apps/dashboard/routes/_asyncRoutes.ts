@@ -9,6 +9,8 @@ export const ASYNC_ADMIN_ROUTES: AsyncRoute[] = [
     { path: 'subscriptions', type: AppType.Dashboard },
     { path: 'pins', type: AppType.Dashboard },
     { path: 'pins/report', page: 'pins/report', type: AppType.Dashboard },
+    { path: 'pinbatches', page: 'pinbatches', type: AppType.Dashboard },
+    { path: 'pinbatches/statistics', page: 'pinbatches/statistics', type: AppType.Dashboard },
     { path: 'devices', type: AppType.Dashboard },
     { path: 'settings', type: AppType.Dashboard },
     { path: 'keys', type: AppType.Dashboard },

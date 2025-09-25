@@ -504,6 +504,8 @@
     "HeaderPinLogin": "PIN login",
     "ButtonPinLogin": "Sign in with PIN",
     "ButtonGeneratePins": "Generate PINs",
+    "ButtonGenerate": "Generate",
+    "ButtonPleaseWait": "Please wait...",
     "ButtonNew": "New",
     "LabelDurationHours": "Duration (hours)",
     "LabelActive": "Active",

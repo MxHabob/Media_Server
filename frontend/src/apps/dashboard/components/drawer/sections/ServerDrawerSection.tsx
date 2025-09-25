@@ -5,6 +5,8 @@ import LibraryAdd from '@mui/icons-material/LibraryAdd';
 import Palette from '@mui/icons-material/Palette';
 import SubscriptionsIcon from '@mui/icons-material/Subscriptions';
 import PinIcon from '@mui/icons-material/Pin';
+import VpnKey from '@mui/icons-material/VpnKey';
+import Assessment from '@mui/icons-material/Assessment';
 import People from '@mui/icons-material/People';
 import PlayCircle from '@mui/icons-material/PlayCircle';
 import Settings from '@mui/icons-material/Settings';
@@ -98,6 +100,22 @@ const ServerDrawerSection = () => {
                         <PinIcon />
                     </ListItemIcon>
                     <ListItemText primary={globalize.translate('HeaderPins')} />
+                </ListItemLink>
+            </ListItem>
+            <ListItem disablePadding>
+                <ListItemLink to='/dashboard/pinbatches'>
+                    <ListItemIcon>
+                        <VpnKey />
+                    </ListItemIcon>
+                    <ListItemText primary='PIN Batch Management' />
+                </ListItemLink>
+            </ListItem>
+            <ListItem disablePadding>
+                <ListItemLink to='/dashboard/pinbatches/statistics'>
+                    <ListItemIcon>
+                        <Assessment />
+                    </ListItemIcon>
+                    <ListItemText primary='PIN Statistics' />
                 </ListItemLink>
             </ListItem>
             <ListItem disablePadding>
