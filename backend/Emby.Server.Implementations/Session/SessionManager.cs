@@ -1676,6 +1676,10 @@ namespace Emby.Server.Implementations.Session
 
             _logger.LogInformation("Creating new access token for user {0}", user.Id);
             var device = await _deviceManager.CreateDevice(new Device(user.Id, app, appVersion, deviceName, deviceId)).ConfigureAwait(false);
+            
+            // Ensure the device is properly created and accessible
+            await Task.Delay(50).ConfigureAwait(false);
+            _logger.LogInformation("Access token created successfully for user {0}", user.Id);
 
             return device.AccessToken;
         }

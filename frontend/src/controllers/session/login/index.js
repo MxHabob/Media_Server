@@ -25,14 +25,15 @@ import './login.scss';
 
 const enableFocusTransform = !browser.slow && !browser.edge;
 
-function authenticateUserByName(page, apiClient, url, username, password) {
+async function authenticateUserByName(page, apiClient, url, username, password) {
     loading.show();
-    apiClient.authenticateUserByName(username, password).then(function (result) {
+    try {
+        const result = await apiClient.authenticateUserByName(username, password);
         const user = result.User;
         loading.hide();
 
-        onLoginSuccessful(user.Id, result.AccessToken, apiClient, url);
-    }, function (response) {
+        await onLoginSuccessful(user.Id, result.AccessToken, apiClient, url);
+    } catch (response) {
         page.querySelector('#txtManualPassword').value = '';
         loading.hide();
 
@@ -46,7 +47,7 @@ function authenticateUserByName(page, apiClient, url, username, password) {
                 title: globalize.translate('HeaderConnectionFailure')
             });
         }
-    });
+    }
 }
 
 function authenticateQuickConnect(apiClient, targetUrl) {
@@ -130,8 +131,11 @@ async function authenticateWithPin(apiClient, targetUrl) {
             contentType: 'application/json'
         }, true).then(r => r.json());
 
-        onLoginSuccessful(result.User.Id, result.AccessToken, apiClient, targetUrl);
-    } catch (e) {
+        // Wait for session to be fully established before navigation
+        console.log('PIN authentication successful, proceeding with navigation');
+        await onLoginSuccessfulWithDelay(result.User.Id, result.AccessToken, apiClient, targetUrl, result.User.SubscriptionExpirationDate);
+    } catch (error) {
+        console.error('PIN authentication failed:', error);
         Dashboard.alert({
             message: globalize.translate('MessageInvalidPin'),
             title: globalize.translate('HeaderError')
@@ -139,9 +143,128 @@ async function authenticateWithPin(apiClient, targetUrl) {
     }
 }
 
-function onLoginSuccessful(id, accessToken, apiClient, url) {
+async function onLoginSuccessful(id, accessToken, apiClient, url) {
     Dashboard.onServerChanged(id, accessToken, apiClient);
+    // Properly set authentication info on the API client
+    apiClient.setAuthenticationInfo(accessToken, id);
+    // Save credentials for session persistence
+    await saveCredentialsForPinAuth(id, accessToken, apiClient);
     Dashboard.navigate(url || 'home');
+}
+
+async function saveCredentialsForPinAuth(userId, accessToken, apiClient, expirationDate = null) {
+    try {
+        // Get the current credentials
+        const { ServerConnections: ServerConnectionsImport } = await import('../../../lib/jellyfin-apiclient');
+        const credentialProvider = ServerConnectionsImport.credentialProvider();
+        const credentials = credentialProvider.credentials();
+
+        // Find the current server
+        const server = credentials.Servers.find(s => s.Id === apiClient.serverId()) || apiClient.serverInfo();
+
+        // Update server info with authentication details
+        server.UserId = userId;
+        server.AccessToken = accessToken;
+        server.DateLastAccessed = new Date().getTime();
+
+        // Store PIN expiration date if provided
+        if (expirationDate) {
+            server.PinExpirationDate = expirationDate;
+        }
+
+        // Update the credentials
+        credentialProvider.addOrUpdateServer(credentials.Servers, server);
+        credentialProvider.credentials(credentials);
+
+        console.log('Credentials saved for PIN authentication');
+
+        // Set up automatic logout when PIN expires
+        if (expirationDate) {
+            setupPinExpirationTimer(expirationDate);
+        }
+    } catch (error) {
+        console.error('Failed to save credentials for PIN authentication:', error);
+    }
+}
+
+function setupPinExpirationTimer(expirationDate) {
+    if (!expirationDate) return;
+
+    const expirationTime = new Date(expirationDate).getTime();
+    const currentTime = new Date().getTime();
+    const timeUntilExpiration = expirationTime - currentTime;
+
+    if (timeUntilExpiration <= 0) {
+        // PIN is already expired, logout immediately
+        console.log('PIN has already expired, logging out');
+        Dashboard.logout();
+        return;
+    }
+
+    console.log(`PIN will expire in ${Math.round(timeUntilExpiration / 1000 / 60)} minutes`);
+
+    // Set a timer to logout when the PIN expires
+    setTimeout(() => {
+        console.log('PIN has expired, logging out user');
+        Dashboard.alert({
+            message: globalize.translate('MessagePinExpired'),
+            title: globalize.translate('HeaderSessionExpired')
+        });
+        Dashboard.logout();
+    }, timeUntilExpiration);
+}
+
+async function checkPinExpirationOnLoad() {
+    try {
+        const { ServerConnections: ServerConnectionsImport } = await import('../../../lib/jellyfin-apiclient');
+        const credentialProvider = ServerConnectionsImport.credentialProvider();
+        const credentials = credentialProvider.credentials();
+
+        // Check all servers for PIN expiration
+        for (const server of credentials.Servers) {
+            if (server.PinExpirationDate && server.UserId && server.AccessToken) {
+                const expirationTime = new Date(server.PinExpirationDate).getTime();
+                const currentTime = new Date().getTime();
+
+                if (currentTime >= expirationTime) {
+                    console.log('PIN has expired, clearing credentials');
+                    // Clear expired credentials
+                    server.UserId = null;
+                    server.AccessToken = null;
+                    server.PinExpirationDate = null;
+                    credentialProvider.addOrUpdateServer(credentials.Servers, server);
+                    credentialProvider.credentials(credentials);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Failed to check PIN expiration on load:', error);
+    }
+}
+
+async function onLoginSuccessfulWithDelay(id, accessToken, apiClient, url, expirationDate = null) {
+    // Update the API client with new session info
+    Dashboard.onServerChanged(id, accessToken, apiClient);
+
+    // Properly set authentication info on the API client
+    apiClient.setAuthenticationInfo(accessToken, id);
+
+    // Save credentials to localStorage for session persistence
+    await saveCredentialsForPinAuth(id, accessToken, apiClient, expirationDate);
+
+    // Wait for session to be fully established on the backend
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    console.log('Proceeding with navigation after PIN authentication');
+
+    // Navigate to the target URL
+    try {
+        await Dashboard.navigate(url || 'home');
+    } catch (navError) {
+        console.error('Navigation failed after PIN authentication:', navError);
+        // Fallback - force page reload to home
+        window.location.href = '/web/index.html#!/home';
+    }
 }
 
 function showManualForm(context, showCancel, focusPassword) {
@@ -213,6 +336,9 @@ function loadUserList(context, apiClient, users) {
 }
 
 export default function (view, params) {
+    // Check for PIN expiration on page load
+    checkPinExpirationOnLoad();
+
     function getApiClient() {
         const serverId = params.serverid;
 

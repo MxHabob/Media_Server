@@ -288,6 +288,13 @@ public class UserController : BaseJellyfinApiController
                 UserId = user.Id
             }).ConfigureAwait(false);
 
+            // Ensure session is fully established before returning
+            if (result?.AccessToken != null)
+            {
+                // Small delay to ensure session is properly created
+                await Task.Delay(25).ConfigureAwait(false);
+            }
+
             return result;
         }
         catch (AuthenticationException)
