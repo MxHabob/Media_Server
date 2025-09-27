@@ -35,7 +35,8 @@ namespace Jellyfin.Server.Implementations.Export
         /// </summary>
         /// <param name="batch">The PIN batch to export.</param>
         /// <param name="pinBatchUsers">The PIN batch users to export.</param>
-        /// <param name="includeOriginalPins">Whether to include original PINs (requires decryption).</param>
+        /// <param name="includeOriginalPins">Whether to include original PINs (requires decryption). 
+        /// WARNING: PIN codes are highly confidential and should not be exposed to unauthorized personnel.</param>
         /// <returns>A stream containing the Excel file.</returns>
         public async Task<Stream> ExportPinBatchToExcelAsync(
             PinBatch batch, 
@@ -244,6 +245,8 @@ namespace Jellyfin.Server.Implementations.Export
                     try
                     {
                         var originalPin = DecryptPin(pin.OriginalPin);
+                        // SECURITY WARNING: PIN codes are highly confidential and should not be exposed
+                        // This export should only be used by authorized administrators
                         worksheet.Cells[row, col++].Value = originalPin;
                     }
                     catch
@@ -430,7 +433,7 @@ namespace Jellyfin.Server.Implementations.Export
         }
 
         /// <summary>
-        /// Decrypts a PIN from storage.
+        /// Decrypts a PIN from storage using AES decryption.
         /// </summary>
         /// <param name="encryptedPin">The encrypted PIN.</param>
         /// <returns>The decrypted PIN.</returns>
@@ -443,13 +446,42 @@ namespace Jellyfin.Server.Implementations.Export
             
             try
             {
-                var bytes = Convert.FromBase64String(encryptedPin);
-                return System.Text.Encoding.UTF8.GetString(bytes);
+                var encryptedBytes = Convert.FromBase64String(encryptedPin);
+                
+                using var aes = System.Security.Cryptography.Aes.Create();
+                aes.Key = GetEncryptionKey();
+                
+                // Extract IV from the beginning of the encrypted data
+                var iv = new byte[aes.IV.Length];
+                Array.Copy(encryptedBytes, 0, iv, 0, iv.Length);
+                aes.IV = iv;
+                
+                // Extract encrypted data
+                var cipherText = new byte[encryptedBytes.Length - iv.Length];
+                Array.Copy(encryptedBytes, iv.Length, cipherText, 0, cipherText.Length);
+                
+                using var decryptor = aes.CreateDecryptor();
+                var decryptedBytes = decryptor.TransformFinalBlock(cipherText, 0, cipherText.Length);
+                
+                return System.Text.Encoding.UTF8.GetString(decryptedBytes);
             }
             catch
             {
                 return string.Empty;
             }
+        }
+
+        /// <summary>
+        /// Gets the encryption key for PIN encryption/decryption.
+        /// </summary>
+        /// <returns>The encryption key.</returns>
+        private static byte[] GetEncryptionKey()
+        {
+            // In production, this should be stored securely (e.g., in Azure Key Vault, AWS KMS, or environment variables)
+            // For now, using a deterministic key based on machine-specific data
+            var keySource = Environment.MachineName + "JellyfinPinEncryption2024";
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            return sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(keySource));
         }
     }
 }

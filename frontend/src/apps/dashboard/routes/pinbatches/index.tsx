@@ -29,6 +29,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import CreatePinBatchDialog from './CreatePinBatchDialog';
 import EditPinBatchDialog from './EditPinBatchDialog';
 import PinBatchDetailsDialog from './PinBatchDetailsDialog';
+import useLivePinUpdates from '../../features/pins/hooks/useLivePinUpdates';
 
 import type { PinBatch } from '../../types/pinBatch';
 import { PinBatchUtils } from '../../types/pinBatch';
@@ -153,6 +154,9 @@ export const Component = () => {
     const [selectedBatch, setSelectedBatch] = useState<PinBatch | null>(null);
     const [errorMessage, setErrorMessage] = useState<string>('');
     const [successMessage, setSuccessMessage] = useState<string>('');
+
+    // Enable real-time PIN updates
+    useLivePinUpdates();
 
     const { data: batches, isLoading, refetch } = useQuery({
         queryKey: ['PinBatches', statusFilter, subscriptionTypeFilter],

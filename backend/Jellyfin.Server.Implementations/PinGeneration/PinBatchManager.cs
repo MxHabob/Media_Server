@@ -6,6 +6,7 @@ using Jellyfin.Data;
 using Jellyfin.Database.Implementations;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
+using Jellyfin.Server.Implementations.Events;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Model.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -21,6 +22,7 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         private readonly IDbContextFactory<JellyfinDbContext> _dbContextFactory;
         private readonly ILogger<PinBatchManager> _logger;
         private readonly PinGeneratorService _pinGeneratorService;
+        private readonly PinEventService _pinEventService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PinBatchManager"/> class.
@@ -28,14 +30,17 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         /// <param name="dbContextFactory">The database context factory.</param>
         /// <param name="logger">The logger.</param>
         /// <param name="pinGeneratorService">The PIN generator service.</param>
+        /// <param name="pinEventService">The PIN event service.</param>
         public PinBatchManager(
             IDbContextFactory<JellyfinDbContext> dbContextFactory,
             ILogger<PinBatchManager> logger,
-            PinGeneratorService pinGeneratorService)
+            PinGeneratorService pinGeneratorService,
+            PinEventService pinEventService)
         {
             _dbContextFactory = dbContextFactory;
             _logger = logger;
             _pinGeneratorService = pinGeneratorService;
+            _pinEventService = pinEventService;
         }
 
         /// <summary>
@@ -176,6 +181,9 @@ namespace Jellyfin.Server.Implementations.PinGeneration
                 name,
                 generatedPins.Count,
                 batch.Id);
+
+            // Publish real-time event for immediate frontend updates
+            await _pinEventService.PublishPinBatchCreatedAsync(batch.Id, batch.Name, generatedPins.Count).ConfigureAwait(false);
 
             return batch;
         }
@@ -569,20 +577,32 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         }
 
         /// <summary>
-        /// Encrypts a PIN for storage.
+        /// Encrypts a PIN for storage using AES encryption.
         /// </summary>
         /// <param name="pin">The PIN to encrypt.</param>
         /// <returns>The encrypted PIN.</returns>
         private static string EncryptPin(string pin)
         {
-            // Simple encryption for reference storage
-            // In production, use proper encryption with a secure key
-            var bytes = System.Text.Encoding.UTF8.GetBytes(pin);
-            return Convert.ToBase64String(bytes);
+            // Use AES encryption with a secure key for PIN storage
+            // This prevents PIN exposure even if database is compromised
+            using var aes = System.Security.Cryptography.Aes.Create();
+            aes.Key = GetEncryptionKey();
+            aes.GenerateIV();
+            
+            using var encryptor = aes.CreateEncryptor();
+            var pinBytes = System.Text.Encoding.UTF8.GetBytes(pin);
+            var encryptedBytes = encryptor.TransformFinalBlock(pinBytes, 0, pinBytes.Length);
+            
+            // Combine IV and encrypted data
+            var result = new byte[aes.IV.Length + encryptedBytes.Length];
+            Array.Copy(aes.IV, 0, result, 0, aes.IV.Length);
+            Array.Copy(encryptedBytes, 0, result, aes.IV.Length, encryptedBytes.Length);
+            
+            return Convert.ToBase64String(result);
         }
 
         /// <summary>
-        /// Decrypts a PIN from storage.
+        /// Decrypts a PIN from storage using AES decryption.
         /// </summary>
         /// <param name="encryptedPin">The encrypted PIN.</param>
         /// <returns>The decrypted PIN.</returns>
@@ -590,13 +610,42 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         {
             try
             {
-                var bytes = Convert.FromBase64String(encryptedPin);
-                return System.Text.Encoding.UTF8.GetString(bytes);
+                var encryptedBytes = Convert.FromBase64String(encryptedPin);
+                
+                using var aes = System.Security.Cryptography.Aes.Create();
+                aes.Key = GetEncryptionKey();
+                
+                // Extract IV from the beginning of the encrypted data
+                var iv = new byte[aes.IV.Length];
+                Array.Copy(encryptedBytes, 0, iv, 0, iv.Length);
+                aes.IV = iv;
+                
+                // Extract encrypted data
+                var cipherText = new byte[encryptedBytes.Length - iv.Length];
+                Array.Copy(encryptedBytes, iv.Length, cipherText, 0, cipherText.Length);
+                
+                using var decryptor = aes.CreateDecryptor();
+                var decryptedBytes = decryptor.TransformFinalBlock(cipherText, 0, cipherText.Length);
+                
+                return System.Text.Encoding.UTF8.GetString(decryptedBytes);
             }
             catch
             {
                 return string.Empty;
             }
+        }
+
+        /// <summary>
+        /// Gets the encryption key for PIN encryption/decryption.
+        /// </summary>
+        /// <returns>The encryption key.</returns>
+        private static byte[] GetEncryptionKey()
+        {
+            // In production, this should be stored securely (e.g., in Azure Key Vault, AWS KMS, or environment variables)
+            // For now, using a deterministic key based on machine-specific data
+            var keySource = Environment.MachineName + "JellyfinPinEncryption2024";
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            return sha256.ComputeHash(System.Text.Encoding.UTF8.GetBytes(keySource));
         }
 
         /// <summary>
@@ -635,6 +684,9 @@ namespace Jellyfin.Server.Implementations.PinGeneration
 
             _logger.LogInformation("Deleted all {PinCount} PINs from batch '{BatchName}' (ID: {BatchId})", 
                 pinBatchUsers.Count, batch.Name, batchId);
+
+            // Publish real-time event for immediate frontend updates
+            await _pinEventService.PublishPinBatchDeletedAsync(batchId, batch.Name, pinBatchUsers.Count).ConfigureAwait(false);
 
             return true;
         }
@@ -724,7 +776,92 @@ namespace Jellyfin.Server.Implementations.PinGeneration
                 userId,
                 pinBatchUser.BatchId);
 
+            // Publish real-time event for PIN usage tracking
+            await _pinEventService.PublishPinUsedAsync(pinBatchUser.Id, userId, pinBatchUser.BatchId, remoteEndPoint).ConfigureAwait(false);
+
             return true;
+        }
+
+        /// <summary>
+        /// Marks a PIN as expired and prevents further use.
+        /// </summary>
+        /// <param name="pinId">The PIN ID.</param>
+        /// <param name="userId">The user ID.</param>
+        /// <returns>True if marked as expired successfully, false if PIN not found.</returns>
+        public async Task<bool> MarkPinAsExpiredAsync(Guid pinId, Guid userId)
+        {
+            using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+            var pinBatchUser = await dbContext.PinBatchUsers
+                .FirstOrDefaultAsync(pbu => pbu.Id.Equals(pinId) && pbu.UserId.Equals(userId))
+                .ConfigureAwait(false);
+
+            if (pinBatchUser == null)
+            {
+                return false;
+            }
+
+            // Mark PIN as inactive and expired
+            pinBatchUser.IsActive = false;
+            pinBatchUser.ExpirationDate = DateTime.UtcNow; // Set to current time to ensure immediate expiration
+            pinBatchUser.DeactivatedDate = DateTime.UtcNow;
+            pinBatchUser.DeactivationReason = "PIN expired";
+
+            await dbContext.SaveChangesAsync().ConfigureAwait(false);
+
+            // Publish real-time event for PIN expiration
+            await _pinEventService.PublishPinExpiredAsync(pinId, userId, pinBatchUser.BatchId).ConfigureAwait(false);
+
+            _logger.LogInformation(
+                "Marked PIN {PinId} as expired for user {UserId} in batch {BatchId}",
+                pinId,
+                userId,
+                pinBatchUser.BatchId);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Checks if a PIN has been used and prevents reuse after expiration.
+        /// </summary>
+        /// <param name="pin">The PIN to check.</param>
+        /// <returns>True if PIN is valid and not expired, false otherwise.</returns>
+        public async Task<bool> IsPinValidAndNotExpiredAsync(string pin)
+        {
+            using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+            // Find the PIN batch user entry
+            var pinBatchUsers = await dbContext.PinBatchUsers
+                .Where(pbu => pbu.IsActive)
+                .ToListAsync()
+                .ConfigureAwait(false);
+
+            foreach (var pinBatchUser in pinBatchUsers)
+            {
+                // Verify the PIN using BCrypt
+                if (BCrypt.Net.BCrypt.Verify(pin, pinBatchUser.PinCode))
+                {
+                    // Check if PIN is expired
+                    if (pinBatchUser.ExpirationDate.HasValue && pinBatchUser.ExpirationDate.Value <= DateTime.UtcNow)
+                    {
+                        // PIN is expired, mark as inactive
+                        pinBatchUser.IsActive = false;
+                        pinBatchUser.DeactivatedDate = DateTime.UtcNow;
+                        pinBatchUser.DeactivationReason = "PIN expired during validation";
+                        
+                        await dbContext.SaveChangesAsync().ConfigureAwait(false);
+                        
+                        // Publish expiration event
+                        await _pinEventService.PublishPinExpiredAsync(pinBatchUser.Id, pinBatchUser.UserId ?? Guid.Empty, pinBatchUser.BatchId).ConfigureAwait(false);
+                        
+                        return false;
+                    }
+
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

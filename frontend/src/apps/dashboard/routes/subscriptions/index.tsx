@@ -30,6 +30,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
 import type { SubscriptionConfigurationDto } from '../../types/pinBatch';
+import useLivePinUpdates from '../../features/pins/hooks/useLivePinUpdates';
 
 const fetchConfigs = async (apiClient: ApiClient): Promise<SubscriptionConfigurationDto[]> => {
     const res = await fetch(apiClient.getUrl('/Subscriptions/Configurations'), {
@@ -77,6 +78,10 @@ const createPinBatchFromSubscription = async (apiClient: ApiClient, configuratio
 export const Component = () => {
     const { __legacyApiClient__ } = useApi();
     const qc = useQueryClient();
+    
+    // Enable real-time PIN updates
+    useLivePinUpdates();
+
     const { data, isLoading } = useQuery({
         queryKey: ['Subscriptions', 'Configurations'],
         queryFn: () => fetchConfigs(__legacyApiClient__!)
@@ -87,15 +92,15 @@ export const Component = () => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [pinBatchDialogOpen, setPinBatchDialogOpen] = useState(false);
     const [draft, setDraft] = useState<SubscriptionConfigurationDto>({ 
-        Name: '', 
-        SubscriptionType: 3, // Daily
-        CustomDurationHours: 24, 
+        Name: '',
+        SubscriptionType: 3,
+        CustomDurationHours: 24,
         MaxConcurrentSessions: 1,
         AllowRemoteAccess: false,
         AllowTranscoding: true,
         AllowDownload: false,
         AllowSyncPlay: false,
-        IsActive: true 
+        IsActive: true
     });
     const [selectedConfig, setSelectedConfig] = useState<SubscriptionConfigurationDto | null>(null);
     const [pinBatchForm, setPinBatchForm] = useState({
@@ -397,15 +402,6 @@ export const Component = () => {
                         <Grid item xs={12}>
                             <TextField
                                 fullWidth
-                                label='Name'
-                                value={draft.Name}
-                                onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, Name: e.target.value }))}
-                                required
-                            />
-                        </Grid>
-                        <Grid item xs={12}>
-                            <TextField
-                                fullWidth
                                 label='Duration (Hours)'
                                 type='number'
                                 value={draft.CustomDurationHours || 24}
@@ -417,21 +413,12 @@ export const Component = () => {
                         <Grid item xs={12}>
                             <TextField
                                 fullWidth
-                                label='Subscription Type'
-                                select
-                                value={draft.SubscriptionType}
-                                onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, SubscriptionType: Number(e.target.value) }))}
+                                label='Subscription Name'
+                                value={draft.Name}
+                                onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, Name: e.target.value }))}
                                 required
-                            >
-                                <MenuItem value={0}>SixHours</MenuItem>
-                                <MenuItem value={1}>TwelveHours</MenuItem>
-                                <MenuItem value={2}>TwentyFourHours</MenuItem>
-                                <MenuItem value={3}>Daily</MenuItem>
-                                <MenuItem value={4}>Weekly</MenuItem>
-                                <MenuItem value={5}>Monthly</MenuItem>
-                                <MenuItem value={6}>Lifetime</MenuItem>
-                                <MenuItem value={7}>Custom</MenuItem>
-                            </TextField>
+                                helperText='Enter a descriptive name for your subscription (e.g., "Silver 4 Hours", "Golden 9 Hours", "Weekly Package", "Lifetime Package")'
+                            />
                         </Grid>
                         <Grid item xs={12}>
                             <TextField

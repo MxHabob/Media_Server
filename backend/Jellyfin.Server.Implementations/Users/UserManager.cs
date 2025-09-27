@@ -30,6 +30,7 @@ using MediaBrowser.Model.Users;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Security.Cryptography; // Added for secure PIN generation
+using Jellyfin.Server.Implementations.PinGeneration;
 
 namespace Jellyfin.Server.Implementations.Users
 {
@@ -48,6 +49,7 @@ namespace Jellyfin.Server.Implementations.Users
         private readonly IReadOnlyCollection<IAuthenticationProvider> _authenticationProviders;
         private readonly InvalidAuthProvider _invalidAuthProvider;
         private readonly DefaultAuthenticationProvider _defaultAuthenticationProvider;
+        private readonly IServiceProvider _serviceProvider;
         private readonly DefaultPasswordResetProvider _defaultPasswordResetProvider;
         private readonly IServerConfigurationManager _serverConfigurationManager;
 
@@ -65,7 +67,8 @@ namespace Jellyfin.Server.Implementations.Users
             ILogger<UserManager> logger,
             IServerConfigurationManager serverConfigurationManager,
             IEnumerable<IPasswordResetProvider> passwordResetProviders,
-            IEnumerable<IAuthenticationProvider> authenticationProviders)
+            IEnumerable<IAuthenticationProvider> authenticationProviders,
+            IServiceProvider serviceProvider)
         {
             _dbProvider = dbProvider;
             _eventManager = eventManager;
@@ -74,6 +77,7 @@ namespace Jellyfin.Server.Implementations.Users
             _imageProcessor = imageProcessor;
             _logger = logger;
             _serverConfigurationManager = serverConfigurationManager;
+            _serviceProvider = serviceProvider;
 
             _passwordResetProviders = passwordResetProviders.ToList();
             _authenticationProviders = authenticationProviders.ToList();
@@ -300,6 +304,19 @@ namespace Jellyfin.Server.Implementations.Users
             {
                 _logger.LogInformation("Authentication request for PIN has been denied (IP: {IP}).", remoteEndPoint);
                 throw new AuthenticationException("Invalid PIN entered.");
+            }
+
+            // Additional security check: Verify PIN is not expired in batch system
+            // This prevents reuse of expired PINs even if they exist in the user table
+            var pinBatchManager = _serviceProvider.GetService<PinBatchManager>();
+            if (pinBatchManager != null)
+            {
+                var isPinValid = await pinBatchManager.IsPinValidAndNotExpiredAsync(pin).ConfigureAwait(false);
+                if (!isPinValid)
+                {
+                    _logger.LogInformation("Authentication request for expired PIN has been denied (IP: {IP}).", remoteEndPoint);
+                    throw new SecurityException("PIN has expired and cannot be reused.");
+                }
             }
 
             // Check expiration

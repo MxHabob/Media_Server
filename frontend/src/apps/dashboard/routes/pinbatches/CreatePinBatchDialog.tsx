@@ -39,7 +39,8 @@ export default function CreatePinBatchDialog({ open, onClose }: CreatePinBatchDi
     const [formData, setFormData] = useState<CreatePinBatchRequest>({
         Name: '',
         Description: '',
-        SubscriptionType: 3, // Daily
+        SubscriptionType: 9, // Custom
+        CustomDurationHours: 24, // Default 24 hours
         PinPattern: 0, // Numeric
         PinLength: 6,
         PinCount: 10,
@@ -66,7 +67,8 @@ export default function CreatePinBatchDialog({ open, onClose }: CreatePinBatchDi
             setFormData({
                 Name: '',
                 Description: '',
-                SubscriptionType: 3,
+                SubscriptionType: 9, // Custom
+                CustomDurationHours: 24, // Default 24 hours
                 PinPattern: 0,
                 PinLength: 6,
                 PinCount: 10,
@@ -204,23 +206,14 @@ export default function CreatePinBatchDialog({ open, onClose }: CreatePinBatchDi
                     <Grid item xs={12} sm={6}>
                         <TextField
                             fullWidth
-                            label='Subscription Type'
-                            select
-                            value={formData.SubscriptionType}
-                            onChange={handleInputChange('SubscriptionType')}
+                            label='Duration (Hours)'
+                            type='number'
+                            value={formData.CustomDurationHours || 24}
+                            onChange={handleNumberInputChange('CustomDurationHours')}
                             disabled={createMutation.isPending}
-                        >
-                            <MenuItem value={0}>None</MenuItem>
-                            <MenuItem value={1}>6 Hours</MenuItem>
-                            <MenuItem value={2}>12 Hours</MenuItem>
-                            <MenuItem value={3}>Daily</MenuItem>
-                            <MenuItem value={4}>Weekly</MenuItem>
-                            <MenuItem value={5}>Monthly</MenuItem>
-                            <MenuItem value={6}>Quarterly</MenuItem>
-                            <MenuItem value={7}>Yearly</MenuItem>
-                            <MenuItem value={8}>Lifetime</MenuItem>
-                            <MenuItem value={9}>Custom</MenuItem>
-                        </TextField>
+                            inputProps={{ min: 1, max: 8760 }} // Max 1 year
+                            helperText='Enter duration in hours (e.g., 4 for 4 hours, 168 for 1 week, 8760 for 1 year)'
+                        />
                     </Grid>
 
                     <Grid item xs={12} sm={6}>
