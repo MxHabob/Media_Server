@@ -15,7 +15,9 @@ enum AccessLevel {
     /** Requires a valid user session */
     User = 'user',
     /** Requires the startup wizard to NOT be completed */
-    Wizard = 'wizard'
+    Wizard = 'wizard',
+    /** Requires PIN control permission */
+    PinControl = 'pincontrol'
 };
 
 type AccessLevelValue = `${AccessLevel}`;
@@ -175,6 +177,33 @@ const ConnectionRequired: FunctionComponent<ConnectionRequiredProps> = ({
                 }
             } catch (ex) {
                 console.warn('[ConnectionRequired] error bouncing from admin route', ex);
+                return;
+            }
+        }
+
+        // If this is a PIN control route, ensure the user has PIN control permission
+        if (level === AccessLevel.PinControl) {
+            try {
+                const user = await client?.getCurrentUser();
+                if (!user?.Policy) {
+                    console.warn('[ConnectionRequired] user without policy attempted to access PIN control route');
+                    bounce(await ServerConnections.connect())
+                        .catch(err => {
+                            console.error('[ConnectionRequired] failed to bounce', err);
+                        });
+                    return;
+                }
+                const userPolicy = user.Policy as typeof user.Policy & { EnablePinControl?: boolean }; // Type assertion until frontend types are regenerated
+                if (!userPolicy.IsAdministrator && !userPolicy.EnablePinControl) {
+                    console.warn('[ConnectionRequired] user without PIN control permission attempted to access PIN control route');
+                    bounce(await ServerConnections.connect())
+                        .catch(err => {
+                            console.error('[ConnectionRequired] failed to bounce', err);
+                        });
+                    return;
+                }
+            } catch (ex) {
+                console.warn('[ConnectionRequired] error bouncing from PIN control route', ex);
                 return;
             }
         }

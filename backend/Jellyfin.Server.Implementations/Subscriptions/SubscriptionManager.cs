@@ -69,13 +69,13 @@ namespace Jellyfin.Server.Implementations.Subscriptions
         public async Task<SubscriptionConfiguration> CreateConfigurationAsync(SubscriptionConfiguration configuration, Guid createdByUserId)
         {
             using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
-            
+
             configuration.CreatedByUserId = createdByUserId;
             configuration.CreatedDate = DateTime.UtcNow;
-            
+
             dbContext.SubscriptionConfigurations.Add(configuration);
             await dbContext.SaveChangesAsync().ConfigureAwait(false);
-            
+
             _logger.LogInformation("Created subscription configuration: {Name} (ID: {Id})", configuration.Name, configuration.Id);
             return configuration;
         }
@@ -84,11 +84,11 @@ namespace Jellyfin.Server.Implementations.Subscriptions
         public async Task<SubscriptionConfiguration> UpdateConfigurationAsync(SubscriptionConfiguration configuration, Guid modifiedByUserId)
         {
             using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
-            
+
             var existing = await dbContext.SubscriptionConfigurations
                 .FirstOrDefaultAsync(c => c.Id.Equals(configuration.Id))
                 .ConfigureAwait(false);
-            
+
             if (existing == null)
             {
                 throw new InvalidOperationException($"Subscription configuration with ID {configuration.Id} not found.");
@@ -114,7 +114,7 @@ namespace Jellyfin.Server.Implementations.Subscriptions
             existing.ModifiedDate = DateTime.UtcNow;
 
             await dbContext.SaveChangesAsync().ConfigureAwait(false);
-            
+
             _logger.LogInformation("Updated subscription configuration: {Name} (ID: {Id})", configuration.Name, configuration.Id);
             return existing;
         }
@@ -123,11 +123,11 @@ namespace Jellyfin.Server.Implementations.Subscriptions
         public async Task<bool> DeleteConfigurationAsync(Guid id)
         {
             using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
-            
+
             var configuration = await dbContext.SubscriptionConfigurations
                 .FirstOrDefaultAsync(c => c.Id.Equals(id))
                 .ConfigureAwait(false);
-            
+
             if (configuration == null)
             {
                 return false;
@@ -141,14 +141,17 @@ namespace Jellyfin.Server.Implementations.Subscriptions
 
             if (usersWithThisConfig > 0)
             {
-                _logger.LogWarning("Cannot delete subscription configuration {Name} (ID: {Id}) as {Count} users are using it", 
-                    configuration.Name, configuration.Id, usersWithThisConfig);
+                _logger.LogWarning(
+                    "Cannot delete subscription configuration {Name} (ID: {Id}) as {Count} users are using it",
+                    configuration.Name,
+                    configuration.Id,
+                    usersWithThisConfig);
                 return false;
             }
 
             dbContext.SubscriptionConfigurations.Remove(configuration);
             await dbContext.SaveChangesAsync().ConfigureAwait(false);
-            
+
             _logger.LogInformation("Deleted subscription configuration: {Name} (ID: {Id})", configuration.Name, configuration.Id);
             return true;
         }
@@ -169,16 +172,19 @@ namespace Jellyfin.Server.Implementations.Subscriptions
 
             // Generate PIN
             var pin = GenerateSecurePin(6);
-            
+
             // Calculate expiration date
             var expirationDate = CalculateExpirationDate(configuration, customDurationHours);
-            
+
             // Create user with subscription
             var user = await _userManager.CreateUserWithSubscriptionAsync(username, pin, configuration, expirationDate).ConfigureAwait(false);
-            
-            _logger.LogInformation("Created user {Username} with subscription {SubscriptionName} (PIN: {Pin})", 
-                username, configuration.Name, pin);
-            
+
+            _logger.LogInformation(
+                "Created user {Username} with subscription {SubscriptionName} (PIN: {Pin})",
+                username,
+                configuration.Name,
+                pin);
+
             return (user, pin);
         }
 
@@ -210,15 +216,17 @@ namespace Jellyfin.Server.Implementations.Subscriptions
 
             user.SubscriptionType = configuration.SubscriptionType;
             user.ExpirationDate = newExpirationDate;
-            
+
             // Apply configuration settings to user
             ApplyConfigurationToUser(user, configuration);
-            
+
             await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
-            
-            _logger.LogInformation("Updated subscription for user {Username} to {SubscriptionName}", 
-                user.Username, configuration.Name);
-            
+
+            _logger.LogInformation(
+                "Updated subscription for user {Username} to {SubscriptionName}",
+                user.Username,
+                configuration.Name);
+
             return user;
         }
 
@@ -242,9 +250,11 @@ namespace Jellyfin.Server.Implementations.Subscriptions
             }
 
             await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
-            
-            _logger.LogInformation("Extended subscription for user {Username} by {Hours} hours", 
-                user.Username, additionalHours);
+
+            _logger.LogInformation(
+                "Extended subscription for user {Username} by {Hours} hours",
+                user.Username,
+                additionalHours);
             
             return user;
         }
@@ -254,7 +264,7 @@ namespace Jellyfin.Server.Implementations.Subscriptions
         {
             var users = _userManager.Users.ToList();
             var configurations = await GetActiveConfigurationsAsync().ConfigureAwait(false);
-            
+
             var statistics = new SubscriptionStatistics
             {
                 TotalActiveSubscriptions = users.Count(u => !u.ExpirationDate.HasValue || u.ExpirationDate.Value >= DateTime.UtcNow),
@@ -271,7 +281,7 @@ namespace Jellyfin.Server.Implementations.Subscriptions
 
             // Calculate average duration
             var usersWithExpiration = users.Where(u => u.ExpirationDate.HasValue).ToList();
-            if (usersWithExpiration.Any())
+            if (usersWithExpiration.Count > 0)
             {
                 statistics.AverageDurationHours = usersWithExpiration
                     .Average(u => (u.ExpirationDate!.Value - DateTime.UtcNow).TotalHours);
@@ -308,9 +318,9 @@ namespace Jellyfin.Server.Implementations.Subscriptions
         public Task<IEnumerable<User>> GetUsersWithExpiringSubscriptionsAsync(int hoursBeforeExpiration = 24)
         {
             var expirationThreshold = DateTime.UtcNow.AddHours(hoursBeforeExpiration);
-            
+
             return Task.FromResult(_userManager.Users
-                .Where(u => u.ExpirationDate.HasValue && 
+                .Where(u => u.ExpirationDate.HasValue &&
                            u.ExpirationDate.Value <= expirationThreshold && 
                            u.ExpirationDate.Value > DateTime.UtcNow)
                 .ToList() as IEnumerable<User>);
@@ -380,20 +390,20 @@ namespace Jellyfin.Server.Implementations.Subscriptions
         private static void ApplyConfigurationToUser(User user, SubscriptionConfiguration configuration)
         {
             user.MaxActiveSessions = configuration.MaxConcurrentSessions;
-            
+
             if (configuration.MaxParentalRating.HasValue)
             {
                 user.MaxParentalRatingScore = configuration.MaxParentalRating.Value;
             }
-            
+
             if (configuration.MaxBitrate.HasValue)
             {
                 user.RemoteClientBitrateLimit = configuration.MaxBitrate.Value;
             }
 
-        // Set permissions based on configuration
-        user.SetPermission(PermissionKind.EnableRemoteAccess, configuration.AllowRemoteAccess);
-        user.SetPermission(PermissionKind.EnableContentDownloading, configuration.AllowDownload);
+            // Set permissions based on configuration
+            user.SetPermission(PermissionKind.EnableRemoteAccess, configuration.AllowRemoteAccess);
+            user.SetPermission(PermissionKind.EnableContentDownloading, configuration.AllowDownload);
 
             if (!configuration.AllowSyncPlay)
             {
@@ -452,7 +462,7 @@ namespace Jellyfin.Server.Implementations.Subscriptions
                 MaxParentalRating = configuration.MaxParentalRating,
                 Price = configuration.Price,
                 Currency = configuration.Currency,
-                Metadata = $"Created from subscription configuration: {configuration.Name}"
+                Metadata = new Dictionary<string, string> { { "source", $"Created from subscription configuration: {configuration.Name}" } }
             };
 
             // Create the PIN batch
@@ -468,8 +478,11 @@ namespace Jellyfin.Server.Implementations.Subscriptions
                 batchExpirationDate,
                 batchSettings).ConfigureAwait(false);
 
-            _logger.LogInformation("Created PIN batch '{BatchName}' from subscription configuration '{ConfigName}' with {PinCount} PINs", 
-                batchName, configuration.Name, pinCount);
+            _logger.LogInformation(
+                "Created PIN batch '{BatchName}' from subscription configuration '{ConfigName}' with {PinCount} PINs",
+                batchName,
+                configuration.Name,
+                pinCount);
 
             return batch;
         }
@@ -530,7 +543,7 @@ namespace Jellyfin.Server.Implementations.Subscriptions
 
             // Get the generated PINs
             var pins = await _pinBatchManager.GetBatchPinsAsync(batch.Id, true, true).ConfigureAwait(false);
-            
+
             // Convert to GeneratedPinInfo
             var result = pins.Select(pin => new GeneratedPinInfo
             {
@@ -548,8 +561,10 @@ namespace Jellyfin.Server.Implementations.Subscriptions
                 CreatedDate = pin.CreatedDate
             }).ToList();
 
-            _logger.LogInformation("Generated {PinCount} PINs for subscription configuration '{ConfigName}'", 
-                pinCount, configuration.Name);
+            _logger.LogInformation(
+                "Generated {PinCount} PINs for subscription configuration '{ConfigName}'",
+                pinCount,
+                configuration.Name);
 
             return result;
         }

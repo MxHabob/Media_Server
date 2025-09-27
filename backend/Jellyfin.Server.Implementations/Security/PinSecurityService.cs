@@ -120,9 +120,9 @@ namespace Jellyfin.Server.Implementations.Security
                 FailedAttemptsLastDay = _pinAttempts.Values
                     .SelectMany(attempts => attempts)
                     .Count(attempt => attempt > oneDayAgo),
-                UniqueIpsLastHour = _ipAttempts.Keys.Count(ip => 
+                UniqueIpsLastHour = _ipAttempts.Keys.Count(ip =>
                     _ipAttempts[ip].Any(attempt => attempt > oneHourAgo)),
-                UniqueIpsLastDay = _ipAttempts.Keys.Count(ip => 
+                UniqueIpsLastDay = _ipAttempts.Keys.Count(ip =>
                     _ipAttempts[ip].Any(attempt => attempt > oneDayAgo))
             };
         }
@@ -152,6 +152,7 @@ namespace Jellyfin.Server.Implementations.Security
             {
                 _logger.LogInformation("PIN manually unlocked");
             }
+
             return removed;
         }
 
@@ -167,6 +168,7 @@ namespace Jellyfin.Server.Implementations.Security
             {
                 _logger.LogInformation("IP address {IP} manually unlocked", ipAddress);
             }
+
             return removed;
         }
 
@@ -201,7 +203,7 @@ namespace Jellyfin.Server.Implementations.Security
         /// <param name="attemptTime">The time of the attempt.</param>
         private void RecordAttempt(string key, DateTime attemptTime)
         {
-            _pinAttempts.AddOrUpdate(key, 
+            _pinAttempts.AddOrUpdate(key,
                 new List<DateTime> { attemptTime },
                 (k, existing) =>
                 {
@@ -311,7 +313,7 @@ namespace Jellyfin.Server.Implementations.Security
         private async Task LogPinAttemptAsync(string pin, string ipAddress, bool success, Guid? userId)
         {
             var logLevel = success ? LogLevel.Information : LogLevel.Warning;
-            var message = success 
+            var message = success
                 ? "Successful PIN authentication attempt (IP: {IP}, UserId: {UserId})"
                 : "Failed PIN authentication attempt (IP: {IP})";
 
@@ -323,39 +325,4 @@ namespace Jellyfin.Server.Implementations.Security
         }
     }
 
-    /// <summary>
-    /// Contains PIN security statistics.
-    /// </summary>
-    public class PinSecurityStatistics
-    {
-        /// <summary>
-        /// Gets or sets the number of currently locked PINs.
-        /// </summary>
-        public int CurrentlyLockedPins { get; set; }
-
-        /// <summary>
-        /// Gets or sets the number of currently locked IP addresses.
-        /// </summary>
-        public int CurrentlyLockedIps { get; set; }
-
-        /// <summary>
-        /// Gets or sets the number of failed attempts in the last hour.
-        /// </summary>
-        public int FailedAttemptsLastHour { get; set; }
-
-        /// <summary>
-        /// Gets or sets the number of failed attempts in the last day.
-        /// </summary>
-        public int FailedAttemptsLastDay { get; set; }
-
-        /// <summary>
-        /// Gets or sets the number of unique IP addresses with attempts in the last hour.
-        /// </summary>
-        public int UniqueIpsLastHour { get; set; }
-
-        /// <summary>
-        /// Gets or sets the number of unique IP addresses with attempts in the last day.
-        /// </summary>
-        public int UniqueIpsLastDay { get; set; }
-    }
 }

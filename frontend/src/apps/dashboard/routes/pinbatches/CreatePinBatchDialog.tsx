@@ -17,27 +17,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { useMutation } from '@tanstack/react-query';
 import type { ApiClient } from 'jellyfin-apiclient';
 import { useApi } from 'hooks/useApi';
-
-type CreatePinBatchRequest = {
-    Name: string;
-    Description?: string;
-    SubscriptionType: number;
-    PinPattern: number;
-    PinLength: number;
-    PinCount: number;
-    CustomCharacterSet?: string;
-    ExpirationDate?: string;
-    MaxConcurrentSessions?: number;
-    AllowRemoteAccess: boolean;
-    AllowTranscoding: boolean;
-    AllowDownload: boolean;
-    AllowSyncPlay: boolean;
-    MaxBitrate?: number;
-    MaxParentalRating?: number;
-    Price?: number;
-    Currency?: string;
-    Metadata?: string;
-};
+import type { CreatePinBatchRequest } from '../../types/pinBatch';
 
 const createPinBatch = async (apiClient: ApiClient, request: CreatePinBatchRequest): Promise<void> => {
     await apiClient.ajax({

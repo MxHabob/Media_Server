@@ -19,36 +19,8 @@ import Alert from '@mui/material/Alert';
 import { useQuery } from '@tanstack/react-query';
 import type { ApiClient } from 'jellyfin-apiclient';
 import { useApi } from 'hooks/useApi';
-
-type PinBatch = {
-    Id: string;
-    Name: string;
-    Description?: string;
-    SubscriptionType: number;
-    PinPattern: number;
-    PinLength: number;
-    CustomCharacterSet?: string;
-    TotalPins: number;
-    UsedPins: number;
-    ActivePins: number;
-    ExpiredPins: number;
-    Status: number;
-    CreatedDate: string;
-    ExpirationDate?: string;
-    ModifiedDate?: string;
-    CreatedByUserId: string;
-    ModifiedByUserId?: string;
-    MaxConcurrentSessions?: number;
-    AllowRemoteAccess: boolean;
-    MaxBitrate?: number;
-    AllowTranscoding: boolean;
-    MaxParentalRating?: number;
-    AllowDownload: boolean;
-    AllowSyncPlay: boolean;
-    Price?: number;
-    Currency?: string;
-    Metadata?: string;
-};
+import type { PinBatch, PinBatchUser } from '../../types/pinBatch';
+import { PinBatchUtils } from '../../types/pinBatch';
 
 type BatchStatistics = {
     BatchId: string;
@@ -62,23 +34,6 @@ type BatchStatistics = {
     AverageUsagePerPin: number;
     CreatedDate: string;
     LastActivityDate?: string;
-};
-
-type PinBatchUser = {
-    Id: string;
-    BatchId: string;
-    UserId: string;
-    IsActive: boolean;
-    CreatedDate: string;
-    FirstUsedDate?: string;
-    LastUsedDate?: string;
-    UsageCount: number;
-    ExpirationDate?: string;
-    DeactivatedDate?: string;
-    DeactivationReason?: string;
-    Metadata?: string;
-    LastLoginIp?: string;
-    LastLoginDevice?: string;
 };
 
 const fetchBatchStatistics = async (apiClient: ApiClient, batchId: string): Promise<BatchStatistics> => {
@@ -151,9 +106,9 @@ const getSubscriptionTypeText = (type: number): string => {
 };
 
 interface PinBatchDetailsDialogProps {
-    open: boolean;
-    onClose: () => void;
-    batch: PinBatch;
+    readonly open: boolean;
+    readonly onClose: () => void;
+    readonly batch: PinBatch;
 }
 
 export default function PinBatchDetailsDialog({ open, onClose, batch }: PinBatchDetailsDialogProps) {
@@ -204,11 +159,11 @@ export default function PinBatchDetailsDialog({ open, onClose, batch }: PinBatch
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <Typography variant='body2' color='text.secondary'>Subscription Type</Typography>
-                                <Typography variant='body1'>{getSubscriptionTypeText(batch.SubscriptionType)}</Typography>
+                                <Typography variant='body1'>{getSubscriptionTypeText(batch.SubscriptionType ?? 0)}</Typography>
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <Typography variant='body2' color='text.secondary'>PIN Pattern</Typography>
-                                <Typography variant='body1'>{getPatternText(batch.PinPattern)}</Typography>
+                                <Typography variant='body1'>{getPatternText(batch.PinPattern ?? 0)}</Typography>
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <Typography variant='body2' color='text.secondary'>PIN Length</Typography>
@@ -334,7 +289,7 @@ export default function PinBatchDetailsDialog({ open, onClose, batch }: PinBatch
                                 {showAllPins ? 'Show Active Only' : 'Show All PINs'}
                             </Button>
                         </Box>
-                        
+
                         {pinsLoading ? (
                             <Box display='flex' justifyContent='center' p={2}>
                                 <CircularProgress />
@@ -350,13 +305,14 @@ export default function PinBatchDetailsDialog({ open, onClose, batch }: PinBatch
                                         <TableCell>Last Used</TableCell>
                                         <TableCell>Usage Count</TableCell>
                                         <TableCell>Expiration</TableCell>
+                                        <TableCell>Time Remaining</TableCell>
                                         <TableCell>Last Login IP</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {pins?.slice(0, 50).map((pin) => (
                                         <TableRow key={pin.Id}>
-                                            <TableCell>{pin.UserId}</TableCell>
+                                            <TableCell>{pin.UserId || 'N/A'}</TableCell>
                                             <TableCell>
                                                 <Chip
                                                     label={pin.IsActive ? 'Active' : 'Inactive'}
@@ -367,8 +323,15 @@ export default function PinBatchDetailsDialog({ open, onClose, batch }: PinBatch
                                             <TableCell>{formatDate(pin.CreatedDate)}</TableCell>
                                             <TableCell>{pin.FirstUsedDate ? formatDate(pin.FirstUsedDate) : 'Never'}</TableCell>
                                             <TableCell>{pin.LastUsedDate ? formatDate(pin.LastUsedDate) : 'Never'}</TableCell>
-                                            <TableCell>{pin.UsageCount}</TableCell>
+                                            <TableCell>{pin.UsageCount || 0}</TableCell>
                                             <TableCell>{pin.ExpirationDate ? formatDateOnly(pin.ExpirationDate) : 'Lifetime'}</TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    label={PinBatchUtils.getTimeRemaining(pin.ExpirationDate)}
+                                                    color={PinBatchUtils.getStatusColor(pin.ExpirationDate)}
+                                                    size='small'
+                                                />
+                                            </TableCell>
                                             <TableCell>{pin.LastLoginIp || 'N/A'}</TableCell>
                                         </TableRow>
                                     )) || []}
@@ -377,7 +340,7 @@ export default function PinBatchDetailsDialog({ open, onClose, batch }: PinBatch
                         ) : (
                             <Alert severity='info'>No PINs found</Alert>
                         )}
-                        
+
                         {pins && pins.length > 50 && (
                             <Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
                                 Showing first 50 PINs of {pins.length} total

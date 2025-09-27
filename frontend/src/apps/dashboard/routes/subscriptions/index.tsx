@@ -1,15 +1,10 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import Page from 'components/Page';
 import globalize from 'lib/globalize';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import TextField from '@mui/material/TextField';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -24,22 +19,17 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import Checkbox from '@mui/material/Checkbox';
 import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
-import IconButton from '@mui/material/IconButton';
-import Tooltip from '@mui/material/Tooltip';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ApiClient } from 'jellyfin-apiclient';
 import { useApi } from 'hooks/useApi';
+import { useMaterialReactTable, type MRT_ColumnDef } from 'material-react-table';
+import TablePage, { DEFAULT_TABLE_OPTIONS } from 'apps/dashboard/components/table/TablePage';
 import AddIcon from '@mui/icons-material/Add';
 import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-type SubscriptionConfigurationDto = {
-    Id?: string;
-    Name: string;
-    DurationHours: number;
-    IsActive: boolean;
-};
+import type { SubscriptionConfigurationDto } from '../../types/pinBatch';
 
 const fetchConfigs = async (apiClient: ApiClient): Promise<SubscriptionConfigurationDto[]> => {
     const res = await fetch(apiClient.getUrl('/Subscriptions/Configurations'), {
@@ -92,9 +82,21 @@ export const Component = () => {
         queryFn: () => fetchConfigs(__legacyApiClient__!)
     });
 
+    const subscriptions = useMemo(() => (data || []), [data]);
+
     const [dialogOpen, setDialogOpen] = useState(false);
     const [pinBatchDialogOpen, setPinBatchDialogOpen] = useState(false);
-    const [draft, setDraft] = useState<SubscriptionConfigurationDto>({ Name: '', DurationHours: 24, IsActive: true });
+    const [draft, setDraft] = useState<SubscriptionConfigurationDto>({ 
+        Name: '', 
+        SubscriptionType: 3, // Daily
+        CustomDurationHours: 24, 
+        MaxConcurrentSessions: 1,
+        AllowRemoteAccess: false,
+        AllowTranscoding: true,
+        AllowDownload: false,
+        AllowSyncPlay: false,
+        IsActive: true 
+    });
     const [selectedConfig, setSelectedConfig] = useState<SubscriptionConfigurationDto | null>(null);
     const [pinBatchForm, setPinBatchForm] = useState({
         BatchName: '',
@@ -118,12 +120,46 @@ export const Component = () => {
     const [errorMessage, setErrorMessage] = useState<string>('');
     const [successMessage, setSuccessMessage] = useState<string>('');
 
+    const columns = useMemo<MRT_ColumnDef<SubscriptionConfigurationDto>[]>(() => [
+        {
+            id: 'Name',
+            accessorKey: 'Name',
+            header: globalize.translate('HeaderName'),
+            size: 200
+        },
+        {
+            id: 'CustomDurationHours',
+            accessorKey: 'CustomDurationHours',
+            header: globalize.translate('HeaderDuration'),
+            Cell: ({ cell }) => {
+                const value = cell.getValue<number>();
+                return value ? `${value} hours` : '0 hours';
+            }
+        },
+        {
+            id: 'IsActive',
+            accessorKey: 'IsActive',
+            header: globalize.translate('HeaderStatus'),
+            Cell: ({ cell }) => cell.getValue<boolean>() ? 'Active' : 'Inactive'
+        }
+    ], []);
+
     const saveMutation = useMutation({
         mutationFn: (payload: SubscriptionConfigurationDto) => upsertConfig(__legacyApiClient__!, payload),
         onSuccess: () => {
-            qc.invalidateQueries({ queryKey: ['Subscriptions', 'Configurations'] });
+            void qc.invalidateQueries({ queryKey: ['Subscriptions', 'Configurations'] });
             setDialogOpen(false);
-            setDraft({ Name: '', DurationHours: 24, IsActive: true });
+            setDraft({ 
+                Name: '', 
+                SubscriptionType: 3, // Daily
+                CustomDurationHours: 24, 
+                MaxConcurrentSessions: 1,
+                AllowRemoteAccess: false,
+                AllowTranscoding: true,
+                AllowDownload: false,
+                AllowSyncPlay: false,
+                IsActive: true 
+            });
         }
     });
 
@@ -166,7 +202,17 @@ export const Component = () => {
     });
 
     const onNew = useCallback(() => {
-        setDraft({ Name: '', DurationHours: 24, IsActive: true });
+        setDraft({ 
+            Name: '', 
+            SubscriptionType: 3, // Daily
+            CustomDurationHours: 24, 
+            MaxConcurrentSessions: 1,
+            AllowRemoteAccess: false,
+            AllowTranscoding: true,
+            AllowDownload: false,
+            AllowSyncPlay: false,
+            IsActive: true 
+        });
         setDialogOpen(true);
     }, []);
 
@@ -191,7 +237,7 @@ export const Component = () => {
         setPinBatchForm(prev => ({
             ...prev,
             BatchName: `${config.Name} PIN Batch`,
-            BatchDescription: `PIN batch for ${config.Name} subscription (${config.DurationHours} hours)`
+            BatchDescription: `PIN batch for ${config.Name} subscription (${config.CustomDurationHours || 24} hours)`
         }));
         setPinBatchDialogOpen(true);
     }, []);
@@ -239,19 +285,19 @@ export const Component = () => {
         pinBatchMutation.mutate({ configId: selectedConfig.Id, request });
     }, [selectedConfig, pinBatchForm, pinBatchMutation]);
 
-    const handleInputChange = useCallback((field: string) => 
+    const handleInputChange = useCallback((field: string) =>
         (event: React.ChangeEvent<HTMLInputElement>) => {
-            const value = event.target.type === 'checkbox' 
-                ? event.target.checked 
+            const value = event.target.type === 'checkbox'
+                ? event.target.checked
                 : event.target.value;
-            
+
             setPinBatchForm(prev => ({
                 ...prev,
                 [field]: value
             }));
         }, []);
 
-    const handleNumberInputChange = useCallback((field: string) => 
+    const handleNumberInputChange = useCallback((field: string) =>
         (event: React.ChangeEvent<HTMLInputElement>) => {
             const value = event.target.value === '' ? undefined : Number(event.target.value);
             setPinBatchForm(prev => ({
@@ -263,8 +309,63 @@ export const Component = () => {
     const handleErrorClose = useCallback(() => setErrorMessage(''), []);
     const handleSuccessClose = useCallback(() => setSuccessMessage(''), []);
 
+    const table = useMaterialReactTable({
+        ...DEFAULT_TABLE_OPTIONS,
+        columns,
+        data: subscriptions,
+        state: {
+            isLoading
+        },
+        enableRowActions: true,
+        positionActionsColumn: 'last',
+        displayColumnDefOptions: {
+            'mrt-row-actions': {
+                header: '',
+                size: 100
+            }
+        },
+        renderTopToolbarCustomActions: () => (
+            <Button
+                startIcon={<AddIcon />}
+                onClick={onNew}
+            >
+                {globalize.translate('ButtonNew')}
+            </Button>
+        ),
+        renderRowActions: ({ row }) => {
+            return (
+                <Box sx={{ display: 'flex' }}>
+                    <Tooltip title={globalize.translate('ButtonCreatePinBatch')}>
+                        <IconButton
+                            color='primary'
+                            onClick={() => onCreatePinBatch(row.original)}
+                        >
+                            <VpnKeyIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title={globalize.translate('ButtonEdit')}>
+                        <IconButton
+                            color='primary'
+                            onClick={() => onEdit(row.original)}
+                        >
+                            <EditIcon />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title={globalize.translate('ButtonDelete')}>
+                        <IconButton
+                            color='error'
+                            onClick={() => onDelete(row.original.Id!)}
+                        >
+                            <DeleteIcon />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
+            );
+        }
+    });
+
     return (
-        <Page id='subscriptions' className='type-interior' title={globalize.translate('HeaderSubscriptions')}>
+        <Page id='subscriptions' className='type-interior' title='Subscriptions'>
             <Box className='content-primary'>
                 {errorMessage ? (
                     <Alert severity='error' onClose={handleErrorClose} sx={{ mb: 2 }}>
@@ -278,89 +379,13 @@ export const Component = () => {
                     </Alert>
                 ) : null}
 
-                <Stack direction='row' justifyContent='space-between' alignItems='center' mb={2}>
-                    <Typography variant='h5'>{globalize.translate('HeaderSubscriptions')}</Typography>
-                    <Button variant='contained' onClick={onNew} startIcon={<AddIcon />}>
-                        {globalize.translate('ButtonNew')}
-                    </Button>
-                </Stack>
-
-                {isLoading ? (
-                    <Box display='flex' justifyContent='center' p={4}>
-                        <CircularProgress />
-                    </Box>
-                ) : (
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Name</TableCell>
-                                <TableCell>Duration (Hours)</TableCell>
-                                <TableCell>Status</TableCell>
-                                <TableCell align='center'>Actions</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {data?.map((config) => (
-                                <TableRow key={config.Id}>
-                                    <TableCell>{config.Name}</TableCell>
-                                    <TableCell>{config.DurationHours}</TableCell>
-                                    <TableCell>
-                                        <Typography 
-                                            variant='body2' 
-                                            color={config.IsActive ? 'success.main' : 'error.main'}
-                                        >
-                                            {config.IsActive ? 'Active' : 'Inactive'}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell align='center'>
-                                        <Stack direction='row' spacing={1} justifyContent='center'>
-                                            <Tooltip title='Create PIN Batch'>
-                                                <IconButton
-                                                    size='small'
-                                                    onClick={onCreatePinBatch(config)}
-                                                    color='primary'
-                                                >
-                                                    <VpnKeyIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                            
-                                            <Tooltip title='Edit'>
-                                                <IconButton
-                                                    size='small'
-                                                    onClick={onEdit(config)}
-                                                >
-                                                    <EditIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                            
-                                            <Tooltip title='Delete'>
-                                                <IconButton
-                                                    size='small'
-                                                    onClick={onDelete(config.Id)}
-                                                    color='error'
-                                                >
-                                                    <DeleteIcon />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </Stack>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                )}
-
-                {data?.length === 0 && !isLoading && (
-                    <Box textAlign='center' p={4}>
-                        <Typography variant='h6' color='text.secondary'>
-                            No subscription configurations found
-                        </Typography>
-                        <Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
-                            Create your first subscription configuration to get started
-                        </Typography>
-                    </Box>
-                )}
-            </Box>
+                <TablePage
+                    id='subscriptionsPage'
+                    title={globalize.translate('HeaderSubscriptions')}
+                    subtitle={globalize.translate('HeaderSubscriptionsHelp')}
+                    className='mainAnimatedPage type-interior'
+                    table={table}
+                />
 
             {/* Subscription Configuration Dialog */}
             <Dialog open={dialogOpen} onClose={onClose} maxWidth='sm' fullWidth>
@@ -374,7 +399,7 @@ export const Component = () => {
                                 fullWidth
                                 label='Name'
                                 value={draft.Name}
-                                onChange={(e) => setDraft(prev => ({ ...prev, Name: e.target.value }))}
+                                onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, Name: e.target.value }))}
                                 required
                             />
                         </Grid>
@@ -383,8 +408,38 @@ export const Component = () => {
                                 fullWidth
                                 label='Duration (Hours)'
                                 type='number'
-                                value={draft.DurationHours}
-                                onChange={(e) => setDraft(prev => ({ ...prev, DurationHours: Number(e.target.value) }))}
+                                value={draft.CustomDurationHours || 24}
+                                onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, CustomDurationHours: Number(e.target.value) }))}
+                                required
+                                inputProps={{ min: 1 }}
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label='Subscription Type'
+                                select
+                                value={draft.SubscriptionType}
+                                onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, SubscriptionType: Number(e.target.value) }))}
+                                required
+                            >
+                                <MenuItem value={0}>SixHours</MenuItem>
+                                <MenuItem value={1}>TwelveHours</MenuItem>
+                                <MenuItem value={2}>TwentyFourHours</MenuItem>
+                                <MenuItem value={3}>Daily</MenuItem>
+                                <MenuItem value={4}>Weekly</MenuItem>
+                                <MenuItem value={5}>Monthly</MenuItem>
+                                <MenuItem value={6}>Lifetime</MenuItem>
+                                <MenuItem value={7}>Custom</MenuItem>
+                            </TextField>
+                        </Grid>
+                        <Grid item xs={12}>
+                            <TextField
+                                fullWidth
+                                label='Max Concurrent Sessions'
+                                type='number'
+                                value={draft.MaxConcurrentSessions}
+                                onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, MaxConcurrentSessions: Number(e.target.value) }))}
                                 required
                                 inputProps={{ min: 1 }}
                             />
@@ -393,8 +448,52 @@ export const Component = () => {
                             <FormControlLabel
                                 control={
                                     <Checkbox
+                                        checked={draft.AllowRemoteAccess}
+                                        onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, AllowRemoteAccess: e.target.checked }))}
+                                    />
+                                }
+                                label='Allow Remote Access'
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        checked={draft.AllowTranscoding}
+                                        onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, AllowTranscoding: e.target.checked }))}
+                                    />
+                                }
+                                label='Allow Transcoding'
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        checked={draft.AllowDownload}
+                                        onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, AllowDownload: e.target.checked }))}
+                                    />
+                                }
+                                label='Allow Download'
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        checked={draft.AllowSyncPlay}
+                                        onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, AllowSyncPlay: e.target.checked }))}
+                                    />
+                                }
+                                label='Allow Sync Play'
+                            />
+                        </Grid>
+                        <Grid item xs={12}>
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
                                         checked={draft.IsActive}
-                                        onChange={(e) => setDraft(prev => ({ ...prev, IsActive: e.target.checked }))}
+                                        onChange={(e) => setDraft((prev: SubscriptionConfigurationDto) => ({ ...prev, IsActive: e.target.checked }))}
                                     />
                                 }
                                 label='Active'
@@ -645,6 +744,7 @@ export const Component = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+            </Box>
         </Page>
     );
 };

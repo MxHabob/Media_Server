@@ -124,4 +124,9 @@ public enum PermissionKind
     /// Whether the user can edit lyrics.
     /// </summary>
     EnableLyricManagement = 23,
+
+    /// <summary>
+    /// Whether the user can control PIN batches and subscriptions.
+    /// </summary>
+    EnablePinControl = 24,
 }

@@ -1,6 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import Page from 'components/Page';
-import globalize from 'lib/globalize';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
@@ -13,10 +12,6 @@ import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import CircularProgress from '@mui/material/CircularProgress';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
 import Alert from '@mui/material/Alert';
 import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
@@ -24,7 +19,6 @@ import Tooltip from '@mui/material/Tooltip';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import type { ApiClient } from 'jellyfin-apiclient';
 import { useApi } from 'hooks/useApi';
-import { useNavigate } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -36,39 +30,8 @@ import CreatePinBatchDialog from './CreatePinBatchDialog';
 import EditPinBatchDialog from './EditPinBatchDialog';
 import PinBatchDetailsDialog from './PinBatchDetailsDialog';
 
-type PinBatch = {
-    Id: string;
-    Name: string;
-    Description?: string;
-    SubscriptionType: number;
-    PinPattern: number;
-    PinLength: number;
-    CustomCharacterSet?: string;
-    TotalPins: number;
-    UsedPins: number;
-    ActivePins: number;
-    ExpiredPins: number;
-    Status: number;
-    CreatedDate: string;
-    ExpirationDate?: string;
-    ModifiedDate?: string;
-    CreatedByUserId: string;
-    ModifiedByUserId?: string;
-    MaxConcurrentSessions?: number;
-    AllowRemoteAccess: boolean;
-    MaxBitrate?: number;
-    AllowTranscoding: boolean;
-    MaxParentalRating?: number;
-    AllowDownload: boolean;
-    AllowSyncPlay: boolean;
-    Price?: number;
-    Currency?: string;
-    Metadata?: string;
-};
-
-type BatchStatus = 'Active' | 'Suspended' | 'Expired' | 'Deleted';
-type PinPattern = 'Numeric' | 'Alphanumeric' | 'AlphanumericMixed' | 'Custom';
-type SubscriptionType = 'None' | 'SixHours' | 'TwelveHours' | 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'Yearly' | 'Lifetime' | 'Custom';
+import type { PinBatch } from '../../types/pinBatch';
+import { PinBatchUtils } from '../../types/pinBatch';
 
 const fetchPinBatches = async (apiClient: ApiClient, status?: number, subscriptionType?: number, createdByUserId?: string): Promise<PinBatch[]> => {
     const params = new URLSearchParams();
@@ -109,9 +72,9 @@ const suspendPinBatch = async (apiClient: ApiClient, batchId: string): Promise<v
 const exportPinBatch = async (apiClient: ApiClient, batchId: string, includeOriginalPins: boolean = false): Promise<void> => {
     const params = new URLSearchParams();
     if (includeOriginalPins) params.append('includeOriginalPins', 'true');
-    
+
     const url = `/PinBatches/${batchId}/Export${params.toString() ? `?${params.toString()}` : ''}`;
-    
+
     const response = await fetch(apiClient.getUrl(url), {
         method: 'GET',
         headers: {
@@ -182,7 +145,6 @@ const getSubscriptionTypeText = (type: number): string => {
 
 export const Component = () => {
     const { __legacyApiClient__ } = useApi();
-    const navigate = useNavigate();
     const [statusFilter, setStatusFilter] = useState<number | undefined>(undefined);
     const [subscriptionTypeFilter, setSubscriptionTypeFilter] = useState<number | undefined>(undefined);
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -234,7 +196,7 @@ export const Component = () => {
     });
 
     const exportMutation = useMutation({
-        mutationFn: ({ batchId, includeOriginalPins }: { batchId: string; includeOriginalPins: boolean }) => 
+        mutationFn: ({ batchId, includeOriginalPins }: { batchId: string; includeOriginalPins: boolean }) =>
             exportPinBatch(__legacyApiClient__!, batchId, includeOriginalPins),
         onSuccess: () => {
             setSuccessMessage('Batch exported successfully');
@@ -350,7 +312,7 @@ export const Component = () => {
                         <MenuItem value={2}>Expired</MenuItem>
                         <MenuItem value={3}>Deleted</MenuItem>
                     </TextField>
-                    
+
                     <TextField
                         label='Subscription Type Filter'
                         select
@@ -391,6 +353,7 @@ export const Component = () => {
                                 <TableCell>Used PINs</TableCell>
                                 <TableCell>Created Date</TableCell>
                                 <TableCell>Expiration Date</TableCell>
+                                <TableCell>Time Remaining</TableCell>
                                 <TableCell align='center'>Actions</TableCell>
                             </TableRow>
                         </TableHead>
@@ -401,18 +364,25 @@ export const Component = () => {
                                     <TableCell>{batch.Description || 'N/A'}</TableCell>
                                     <TableCell>
                                         <Chip
-                                            label={getStatusText(batch.Status)}
-                                            color={getStatusColor(batch.Status)}
+                                            label={getStatusText(batch.Status ?? 0)}
+                                            color={getStatusColor(batch.Status ?? 0)}
                                             size='small'
                                         />
                                     </TableCell>
-                                    <TableCell>{getSubscriptionTypeText(batch.SubscriptionType)}</TableCell>
-                                    <TableCell>{getPatternText(batch.PinPattern)}</TableCell>
+                                    <TableCell>{getSubscriptionTypeText(batch.SubscriptionType ?? 0)}</TableCell>
+                                    <TableCell>{getPatternText(batch.PinPattern ?? 0)}</TableCell>
                                     <TableCell>{batch.TotalPins}</TableCell>
                                     <TableCell>{batch.ActivePins}</TableCell>
                                     <TableCell>{batch.UsedPins}</TableCell>
                                     <TableCell>{formatDateTime(batch.CreatedDate)}</TableCell>
                                     <TableCell>{batch.ExpirationDate ? formatDate(batch.ExpirationDate) : 'Lifetime'}</TableCell>
+                                    <TableCell>
+                                        <Chip
+                                            label={PinBatchUtils.getTimeRemaining(batch.ExpirationDate)}
+                                            color={PinBatchUtils.getStatusColor(batch.ExpirationDate)}
+                                            size='small'
+                                        />
+                                    </TableCell>
                                     <TableCell align='center'>
                                         <Stack direction='row' spacing={1} justifyContent='center'>
                                             <Tooltip title='View Details'>
@@ -423,7 +393,7 @@ export const Component = () => {
                                                     <VisibilityIcon />
                                                 </IconButton>
                                             </Tooltip>
-                                            
+
                                             <Tooltip title='Edit'>
                                                 <IconButton
                                                     size='small'
@@ -454,7 +424,7 @@ export const Component = () => {
                                                     </IconButton>
                                                 </Tooltip>
                                             ) : null}
-                                            
+
                                             <Tooltip title='Export'>
                                                 <IconButton
                                                     size='small'
@@ -464,7 +434,7 @@ export const Component = () => {
                                                     <GetAppIcon />
                                                 </IconButton>
                                             </Tooltip>
-                                            
+
                                             <Tooltip title='Delete'>
                                                 <IconButton
                                                     size='small'

@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Jellyfin.Data;
 using Jellyfin.Database.Implementations;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
+using MediaBrowser.Controller.Entities;
+using MediaBrowser.Model.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -78,15 +81,15 @@ namespace Jellyfin.Server.Implementations.PinGeneration
 
             // Generate PINs
             var generatedPins = _pinGeneratorService.GenerateUniquePins(
-                pinPattern, 
-                pinLength, 
-                pinCount, 
-                customCharacterSet, 
+                pinPattern,
+                pinLength,
+                pinCount,
+                customCharacterSet,
                 existingPins);
 
             if (generatedPins.Count < pinCount)
             {
-                _logger.LogWarning("Could only generate {GeneratedCount} unique PINs out of {RequestedCount} requested", 
+                _logger.LogWarning("Could only generate {GeneratedCount} unique PINs out of {RequestedCount} requested",
                     generatedPins.Count, pinCount);
             }
 
@@ -117,14 +120,45 @@ namespace Jellyfin.Server.Implementations.PinGeneration
             dbContext.PinBatches.Add(batch);
             await dbContext.SaveChangesAsync().ConfigureAwait(false);
 
-            // Create PIN batch user entries
+            // Create User accounts and PIN batch user entries
             var pinBatchUsers = new List<PinBatchUser>();
+            var createdUsers = new List<User>();
+
             foreach (var pin in generatedPins)
             {
+                // Create a unique username based on the PIN
+                var username = $"PIN_{pin}";
+
+                // Create the User account
+                var user = new User(
+                    username,
+                    "Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider",
+                    "Jellyfin.Server.Implementations.Users.DefaultPasswordResetProvider")
+                {
+                    PinCode = BCrypt.Net.BCrypt.HashPassword(pin),
+                    SubscriptionType = subscriptionType,
+                    ExpirationDate = CalculatePinExpirationDate(batch)
+                };
+
+                // Set default permissions
+                user.SetPermission(PermissionKind.EnableRemoteAccess, true);
+                user.SetPermission(PermissionKind.EnableContentDownloading, false);
+                user.SetPermission(PermissionKind.EnableSyncTranscoding, true);
+
+                // Apply batch settings to user if provided
+                if (batchSettings != null)
+                {
+                    ApplyBatchSettingsToUser(user, batchSettings);
+                }
+
+                dbContext.Users.Add(user);
+                createdUsers.Add(user);
+
+                // Create PIN batch user entry linked to the created user
                 var pinBatchUser = new PinBatchUser
                 {
                     BatchId = batch.Id,
-                    UserId = null, // Explicitly set to null since PIN hasn't been used yet
+                    UserId = user.Id, // Link to the created user
                     PinCode = BCrypt.Net.BCrypt.HashPassword(pin),
                     OriginalPin = EncryptPin(pin), // Store encrypted original PIN for reference
                     IsActive = true,
@@ -134,11 +168,14 @@ namespace Jellyfin.Server.Implementations.PinGeneration
                 pinBatchUsers.Add(pinBatchUser);
             }
 
-            dbContext.PinBatchUsers.AddRange(pinBatchUsers);
+            // Save all changes
             await dbContext.SaveChangesAsync().ConfigureAwait(false);
 
-            _logger.LogInformation("Created PIN batch '{BatchName}' with {PinCount} PINs (ID: {BatchId})", 
-                name, generatedPins.Count, batch.Id);
+            _logger.LogInformation(
+                "Created PIN batch '{BatchName}' with {PinCount} PINs (ID: {BatchId})",
+                name,
+                generatedPins.Count,
+                batch.Id);
 
             return batch;
         }
@@ -376,8 +413,11 @@ namespace Jellyfin.Server.Implementations.PinGeneration
 
             await dbContext.SaveChangesAsync().ConfigureAwait(false);
 
-            _logger.LogInformation("Updated PIN batch '{BatchName}' status to {Status} (ID: {BatchId})", 
-                batch.Name, status, batch.Id);
+            _logger.LogInformation(
+                "Updated PIN batch '{BatchName}' status to {Status} (ID: {BatchId})",
+                batch.Name,
+                status,
+                batch.Id);
 
             return true;
         }
@@ -431,6 +471,34 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         }
 
         /// <summary>
+        /// Applies batch settings to a user.
+        /// </summary>
+        /// <param name="user">The user to apply settings to.</param>
+        /// <param name="settings">The settings to apply.</param>
+        private static void ApplyBatchSettingsToUser(User user, BatchSettings settings)
+        {
+            if (settings.MaxConcurrentSessions.HasValue)
+            {
+                user.MaxActiveSessions = settings.MaxConcurrentSessions.Value;
+            }
+
+            if (settings.MaxBitrate.HasValue)
+            {
+                user.RemoteClientBitrateLimit = settings.MaxBitrate.Value;
+            }
+
+            if (settings.MaxParentalRating.HasValue)
+            {
+                user.MaxParentalRatingScore = settings.MaxParentalRating.Value;
+            }
+
+            // Set permissions based on batch settings
+            user.SetPermission(PermissionKind.EnableRemoteAccess, settings.AllowRemoteAccess);
+            user.SetPermission(PermissionKind.EnableContentDownloading, settings.AllowDownload);
+            user.SetPermission(PermissionKind.EnableSyncTranscoding, settings.AllowTranscoding);
+        }
+
+        /// <summary>
         /// Applies batch settings to a batch.
         /// </summary>
         /// <param name="batch">The batch to apply settings to.</param>
@@ -467,9 +535,9 @@ namespace Jellyfin.Server.Implementations.PinGeneration
                 batch.Currency = settings.Currency;
             }
 
-            if (!string.IsNullOrEmpty(settings.Metadata))
+            if (settings.Metadata != null && settings.Metadata.Count > 0)
             {
-                batch.Metadata = settings.Metadata;
+                batch.Metadata = System.Text.Json.JsonSerializer.Serialize(settings.Metadata);
             }
         }
 
@@ -530,122 +598,133 @@ namespace Jellyfin.Server.Implementations.PinGeneration
                 return string.Empty;
             }
         }
-    }
-
-    /// <summary>
-    /// Contains settings for a PIN batch.
-    /// </summary>
-    public class BatchSettings
-    {
-        /// <summary>
-        /// Gets or sets the maximum concurrent sessions.
-        /// </summary>
-        public int? MaxConcurrentSessions { get; set; }
 
         /// <summary>
-        /// Gets or sets whether remote access is allowed.
+        /// Deletes all PINs in a batch.
         /// </summary>
-        public bool AllowRemoteAccess { get; set; } = true;
+        /// <param name="batchId">The batch ID.</param>
+        /// <returns>True if deleted successfully, false if batch not found.</returns>
+        public async Task<bool> DeleteAllBatchPinsAsync(Guid batchId)
+        {
+            using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+            var batch = await dbContext.PinBatches
+                .FirstOrDefaultAsync(b => b.Id.Equals(batchId))
+                .ConfigureAwait(false);
+
+            if (batch == null)
+            {
+                return false;
+            }
+
+            // Delete all PIN batch users for this batch
+            var pinBatchUsers = await dbContext.PinBatchUsers
+                .Where(pbu => pbu.BatchId.Equals(batchId))
+                .ToListAsync()
+                .ConfigureAwait(false);
+
+            dbContext.PinBatchUsers.RemoveRange(pinBatchUsers);
+
+            // Update batch statistics
+            batch.TotalPins = 0;
+            batch.ActivePins = 0;
+            batch.UsedPins = 0;
+            batch.ExpiredPins = 0;
+
+            await dbContext.SaveChangesAsync().ConfigureAwait(false);
+
+            _logger.LogInformation("Deleted all {PinCount} PINs from batch '{BatchName}' (ID: {BatchId})", 
+                pinBatchUsers.Count, batch.Name, batchId);
+
+            return true;
+        }
 
         /// <summary>
-        /// Gets or sets whether transcoding is allowed.
+        /// Deactivates all PINs in a batch.
         /// </summary>
-        public bool AllowTranscoding { get; set; } = true;
+        /// <param name="batchId">The batch ID.</param>
+        /// <returns>True if deactivated successfully, false if batch not found.</returns>
+        public async Task<bool> DeactivateAllBatchPinsAsync(Guid batchId)
+        {
+            using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+            var batch = await dbContext.PinBatches
+                .FirstOrDefaultAsync(b => b.Id.Equals(batchId))
+                .ConfigureAwait(false);
+
+            if (batch == null)
+            {
+                return false;
+            }
+
+            // Deactivate all PIN batch users for this batch
+            var pinBatchUsers = await dbContext.PinBatchUsers
+                .Where(pbu => pbu.BatchId.Equals(batchId) && pbu.IsActive)
+                .ToListAsync()
+                .ConfigureAwait(false);
+
+            foreach (var pinBatchUser in pinBatchUsers)
+            {
+                pinBatchUser.IsActive = false;
+                pinBatchUser.DeactivatedDate = DateTime.UtcNow;
+                pinBatchUser.DeactivationReason = "Batch deactivation";
+            }
+
+            // Update batch statistics
+            batch.ActivePins = 0;
+
+            await dbContext.SaveChangesAsync().ConfigureAwait(false);
+
+            _logger.LogInformation(
+                "Deactivated all {PinCount} PINs in batch '{BatchName}' (ID: {BatchId})",
+                pinBatchUsers.Count,
+                batch.Name,
+                batchId);
+
+            return true;
+        }
 
         /// <summary>
-        /// Gets or sets whether downloads are allowed.
+        /// Updates PIN usage statistics when a PIN is used for authentication.
         /// </summary>
-        public bool AllowDownload { get; set; } = false;
+        /// <param name="userId">The user ID that was authenticated.</param>
+        /// <param name="remoteEndPoint">The remote endpoint of the request.</param>
+        /// <param name="deviceName">The device name used for authentication.</param>
+        /// <returns>True if updated successfully, false if PIN batch user not found.</returns>
+        public async Task<bool> UpdatePinUsageAsync(Guid userId, string remoteEndPoint, string? deviceName = null)
+        {
+            using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-        /// <summary>
-        /// Gets or sets whether sync play is allowed.
-        /// </summary>
-        public bool AllowSyncPlay { get; set; } = true;
+            var pinBatchUser = await dbContext.PinBatchUsers
+                .FirstOrDefaultAsync(pbu => pbu.UserId.Equals(userId))
+                .ConfigureAwait(false);
 
-        /// <summary>
-        /// Gets or sets the maximum bitrate.
-        /// </summary>
-        public int? MaxBitrate { get; set; }
+            if (pinBatchUser == null)
+            {
+                return false;
+            }
 
-        /// <summary>
-        /// Gets or sets the maximum parental rating.
-        /// </summary>
-        public int? MaxParentalRating { get; set; }
+            var now = DateTime.UtcNow;
 
-        /// <summary>
-        /// Gets or sets the price per PIN.
-        /// </summary>
-        public decimal? Price { get; set; }
+            // Update usage statistics
+            if (pinBatchUser.FirstUsedDate == null)
+            {
+                pinBatchUser.FirstUsedDate = now;
+            }
+            
+            pinBatchUser.LastUsedDate = now;
+            pinBatchUser.UsageCount++;
+            pinBatchUser.LastLoginIp = remoteEndPoint;
+            pinBatchUser.LastLoginDevice = deviceName;
 
-        /// <summary>
-        /// Gets or sets the currency.
-        /// </summary>
-        public string? Currency { get; set; }
+            await dbContext.SaveChangesAsync().ConfigureAwait(false);
 
-        /// <summary>
-        /// Gets or sets additional metadata.
-        /// </summary>
-        public string? Metadata { get; set; }
-    }
+            _logger.LogInformation(
+                "Updated PIN usage for user {UserId} in batch {BatchId}",
+                userId,
+                pinBatchUser.BatchId);
 
-    /// <summary>
-    /// Contains statistics for a PIN batch.
-    /// </summary>
-    public class BatchStatistics
-    {
-        /// <summary>
-        /// Gets or sets the batch ID.
-        /// </summary>
-        public Guid BatchId { get; set; }
-
-        /// <summary>
-        /// Gets or sets the batch name.
-        /// </summary>
-        public string BatchName { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the total number of PINs.
-        /// </summary>
-        public int TotalPins { get; set; }
-
-        /// <summary>
-        /// Gets or sets the number of active PINs.
-        /// </summary>
-        public int ActivePins { get; set; }
-
-        /// <summary>
-        /// Gets or sets the number of expired PINs.
-        /// </summary>
-        public int ExpiredPins { get; set; }
-
-        /// <summary>
-        /// Gets or sets the number of used PINs.
-        /// </summary>
-        public int UsedPins { get; set; }
-
-        /// <summary>
-        /// Gets or sets the number of unused PINs.
-        /// </summary>
-        public int UnusedPins { get; set; }
-
-        /// <summary>
-        /// Gets or sets the total usage count.
-        /// </summary>
-        public int TotalUsageCount { get; set; }
-
-        /// <summary>
-        /// Gets or sets the average usage per PIN.
-        /// </summary>
-        public double AverageUsagePerPin { get; set; }
-
-        /// <summary>
-        /// Gets or sets the creation date.
-        /// </summary>
-        public DateTime CreatedDate { get; set; }
-
-        /// <summary>
-        /// Gets or sets the last activity date.
-        /// </summary>
-        public DateTime? LastActivityDate { get; set; }
+            return true;
+        }
     }
 }

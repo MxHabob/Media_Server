@@ -773,7 +773,7 @@ namespace Jellyfin.Database.Providers.Sqlite.Migrations
                 {
                     Id = table.Column<Guid>(type: "TEXT", nullable: false),
                     BatchId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    UserId = table.Column<Guid>(type: "TEXT", nullable: false),
+                    UserId = table.Column<Guid>(type: "TEXT", nullable: true),
                     PinCode = table.Column<string>(type: "TEXT", maxLength: 255, nullable: false),
                     OriginalPin = table.Column<string>(type: "TEXT", maxLength: 255, nullable: true),
                     IsActive = table.Column<bool>(type: "INTEGER", nullable: false),

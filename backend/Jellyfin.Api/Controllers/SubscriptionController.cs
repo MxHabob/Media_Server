@@ -23,7 +23,7 @@ namespace Jellyfin.Api.Controllers
     /// Subscription management controller.
     /// </summary>
     [Route("Subscriptions")]
-    [Authorize(Policy = Policies.RequiresElevation)]
+    [Authorize(Policy = Policies.PinControl)]
     public class SubscriptionController : BaseJellyfinApiController
     {
         private readonly ISubscriptionManager _subscriptionManager;

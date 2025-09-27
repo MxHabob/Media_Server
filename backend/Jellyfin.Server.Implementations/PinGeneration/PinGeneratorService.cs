@@ -66,9 +66,9 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         /// <param name="existingPins">Existing PINs to avoid duplicates.</param>
         /// <returns>A list of unique generated PINs.</returns>
         public List<string> GenerateUniquePins(
-            PinPattern pattern, 
-            int length, 
-            int count, 
+            PinPattern pattern,
+            int length,
+            int count,
             string? customCharacterSet = null,
             HashSet<string>? existingPins = null)
         {
@@ -91,19 +91,21 @@ namespace Jellyfin.Server.Implementations.PinGeneration
             while (generatedPins.Count < count && attempts < maxAttempts)
             {
                 var pin = GeneratePin(pattern, length, customCharacterSet);
-                
+
                 if (!existing.Contains(pin) && !generatedPins.Contains(pin))
                 {
                     generatedPins.Add(pin);
                 }
-                
+
                 attempts++;
             }
 
             if (generatedPins.Count < count)
             {
-                _logger.LogWarning("Could only generate {GeneratedCount} unique PINs out of {RequestedCount} requested", 
-                    generatedPins.Count, count);
+                _logger.LogWarning(
+                    "Could only generate {GeneratedCount} unique PINs out of {RequestedCount} requested",
+                    generatedPins.Count,
+                    count);
             }
 
             return generatedPins.ToList();
@@ -117,15 +119,15 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         /// <param name="existingPins">Existing PINs to avoid duplicates.</param>
         /// <returns>A list of generated PINs with their metadata.</returns>
         public List<GeneratedPinInfo> GeneratePinsForBatch(
-            PinBatch batch, 
-            int count, 
+            PinBatch batch,
+            int count,
             HashSet<string>? existingPins = null)
         {
             var pins = GenerateUniquePins(
-                batch.PinPattern, 
-                batch.PinLength, 
-                count, 
-                batch.CustomCharacterSet, 
+                batch.PinPattern,
+                batch.PinLength,
+                count,
+                batch.CustomCharacterSet,
                 existingPins);
 
             var result = new List<GeneratedPinInfo>();
@@ -223,69 +225,4 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         }
     }
 
-    /// <summary>
-    /// Contains information about a generated PIN.
-    /// </summary>
-    public class GeneratedPinInfo
-    {
-        /// <summary>
-        /// Gets or sets the generated PIN.
-        /// </summary>
-        public string Pin { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Gets or sets the batch ID.
-        /// </summary>
-        public Guid BatchId { get; set; }
-
-        /// <summary>
-        /// Gets or sets the subscription type.
-        /// </summary>
-        public SubscriptionType SubscriptionType { get; set; }
-
-        /// <summary>
-        /// Gets or sets the expiration date.
-        /// </summary>
-        public DateTime? ExpirationDate { get; set; }
-
-        /// <summary>
-        /// Gets or sets the maximum concurrent sessions.
-        /// </summary>
-        public int? MaxConcurrentSessions { get; set; }
-
-        /// <summary>
-        /// Gets or sets whether remote access is allowed.
-        /// </summary>
-        public bool AllowRemoteAccess { get; set; }
-
-        /// <summary>
-        /// Gets or sets the maximum bitrate.
-        /// </summary>
-        public int? MaxBitrate { get; set; }
-
-        /// <summary>
-        /// Gets or sets whether transcoding is allowed.
-        /// </summary>
-        public bool AllowTranscoding { get; set; }
-
-        /// <summary>
-        /// Gets or sets the maximum parental rating.
-        /// </summary>
-        public int? MaxParentalRating { get; set; }
-
-        /// <summary>
-        /// Gets or sets whether downloads are allowed.
-        /// </summary>
-        public bool AllowDownload { get; set; }
-
-        /// <summary>
-        /// Gets or sets whether sync play is allowed.
-        /// </summary>
-        public bool AllowSyncPlay { get; set; }
-
-        /// <summary>
-        /// Gets or sets the creation date.
-        /// </summary>
-        public DateTime CreatedDate { get; set; }
-    }
 }

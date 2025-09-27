@@ -22,7 +22,7 @@ namespace Jellyfin.Api.Controllers
     /// PIN batch management controller.
     /// </summary>
     [Route("PinBatches")]
-    [Authorize(Policy = Policies.RequiresElevation)]
+    [Authorize(Policy = Policies.PinControl)]
     public class PinBatchController : BaseJellyfinApiController
     {
         private readonly PinBatchManager _pinBatchManager;
@@ -72,7 +72,7 @@ namespace Jellyfin.Api.Controllers
                     MaxParentalRating = request.MaxParentalRating,
                     Price = request.Price,
                     Currency = request.Currency,
-                    Metadata = request.Metadata
+                    Metadata = ParseMetadata(request.Metadata)
                 };
 
                 var batch = await _pinBatchManager.CreateBatchAsync(
@@ -425,6 +425,66 @@ namespace Jellyfin.Api.Controllers
         }
 
         /// <summary>
+        /// Deletes all PINs in a batch.
+        /// </summary>
+        /// <param name="batchId">The batch ID.</param>
+        /// <response code="204">All PINs deleted successfully.</response>
+        /// <response code="404">Batch not found.</response>
+        /// <returns>No content on success.</returns>
+        [HttpDelete("{batchId}/Pins")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult> DeleteAllBatchPins([FromRoute, Required] Guid batchId)
+        {
+            try
+            {
+                var success = await _pinBatchManager.DeleteAllBatchPinsAsync(batchId).ConfigureAwait(false);
+
+                if (!success)
+                {
+                    return NotFound("Batch not found.");
+                }
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting all PINs in batch {BatchId}", batchId);
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while deleting all PINs in the batch.");
+            }
+        }
+
+        /// <summary>
+        /// Deactivates all PINs in a batch.
+        /// </summary>
+        /// <param name="batchId">The batch ID.</param>
+        /// <response code="204">All PINs deactivated successfully.</response>
+        /// <response code="404">Batch not found.</response>
+        /// <returns>No content on success.</returns>
+        [HttpPost("{batchId}/Pins/Deactivate")]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<ActionResult> DeactivateAllBatchPins([FromRoute, Required] Guid batchId)
+        {
+            try
+            {
+                var success = await _pinBatchManager.DeactivateAllBatchPinsAsync(batchId).ConfigureAwait(false);
+
+                if (!success)
+                {
+                    return NotFound("Batch not found.");
+                }
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deactivating all PINs in batch {BatchId}", batchId);
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while deactivating all PINs in the batch.");
+            }
+        }
+
+        /// <summary>
         /// Gets PINs from a batch.
         /// </summary>
         /// <param name="batchId">The batch ID.</param>
@@ -568,6 +628,29 @@ namespace Jellyfin.Api.Controllers
         {
             var invalidChars = System.IO.Path.GetInvalidFileNameChars();
             return string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries)).TrimEnd('.');
+        }
+
+        /// <summary>
+        /// Parses metadata string to dictionary.
+        /// </summary>
+        /// <param name="metadata">The metadata string to parse.</param>
+        /// <returns>The parsed metadata dictionary or null if parsing fails.</returns>
+        private static Dictionary<string, string>? ParseMetadata(string? metadata)
+        {
+            if (string.IsNullOrEmpty(metadata))
+            {
+                return null;
+            }
+
+            try
+            {
+                return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(metadata);
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                // If JSON parsing fails, treat the entire string as a single key-value pair
+                return new Dictionary<string, string> { { "metadata", metadata } };
+            }
         }
     }
 

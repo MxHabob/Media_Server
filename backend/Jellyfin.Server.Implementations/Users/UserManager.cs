@@ -349,6 +349,11 @@ namespace Jellyfin.Server.Implementations.Users
 
             user.InvalidLoginAttemptCount = 0;
             await UpdateUserAsync(user).ConfigureAwait(false);
+
+            // Update PIN usage statistics if this is a PIN batch user
+            // Note: This would require dependency injection of PinBatchManager,
+            // which might cause circular dependencies. Consider using events instead.
+
             _logger.LogInformation("Authentication request for {UserName} via PIN has succeeded.", user.Username);
             return user;
         }
@@ -408,15 +413,15 @@ namespace Jellyfin.Server.Implementations.Users
             {
                 var user = await CreateUserInternalAsync(name, dbContext, pin, configuration.SubscriptionType).ConfigureAwait(false);
                 user.ExpirationDate = expirationDate;
-                
+
                 // Apply configuration settings
                 user.MaxActiveSessions = configuration.MaxConcurrentSessions;
-                
+
                 if (configuration.MaxParentalRating.HasValue)
                 {
                     user.MaxParentalRatingScore = configuration.MaxParentalRating.Value;
                 }
-                
+
                 if (configuration.MaxBitrate.HasValue)
                 {
                     user.RemoteClientBitrateLimit = configuration.MaxBitrate.Value;
@@ -767,6 +772,7 @@ namespace Jellyfin.Server.Implementations.Users
                 newUser.SetPermission(PermissionKind.IsAdministrator, true);
                 newUser.SetPermission(PermissionKind.EnableContentDeletion, true);
                 newUser.SetPermission(PermissionKind.EnableRemoteControlOfOtherUsers, true);
+                newUser.SetPermission(PermissionKind.EnablePinControl, true);
 
                 dbContext.Users.Add(newUser);
                 await dbContext.SaveChangesAsync().ConfigureAwait(false);

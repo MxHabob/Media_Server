@@ -1,134 +1,54 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import Page from 'components/Page';
-import globalize from 'lib/globalize';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import TextField from '@mui/material/TextField';
-import MenuItem from '@mui/material/MenuItem';
-import CircularProgress from '@mui/material/CircularProgress';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import Alert from '@mui/material/Alert';
-import Chip from '@mui/material/Chip';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
-import Grid from '@mui/material/Grid';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import type { ApiClient } from 'jellyfin-apiclient';
-import { useApi } from 'hooks/useApi';
-import { useNavigate } from 'react-router-dom';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import GetAppIcon from '@mui/icons-material/GetApp';
-import AssessmentIcon from '@mui/icons-material/Assessment';
-import ViewListIcon from '@mui/icons-material/ViewList';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import PauseIcon from '@mui/icons-material/Pause';
+import BlockIcon from '@mui/icons-material/Block';
+import ClearAllIcon from '@mui/icons-material/ClearAll';
+import { type MRT_ColumnDef, useMaterialReactTable } from 'material-react-table';
+import React, { useCallback, useMemo, useState } from 'react';
 
-type UserDto = {
-    Id: string;
-    Name: string;
-    Username?: string;
-    Policy?: unknown;
-};
+import TablePage, { DEFAULT_TABLE_OPTIONS } from 'apps/dashboard/components/table/TablePage';
+import { usePinBatches } from 'apps/dashboard/features/pins/api/usePinBatches';
+import { useDeletePinBatch } from 'apps/dashboard/features/pins/api/useDeletePinBatch';
+import { useActivatePinBatch } from 'apps/dashboard/features/pins/api/useActivatePinBatch';
+import { useSuspendPinBatch } from 'apps/dashboard/features/pins/api/useSuspendPinBatch';
+import { useExportPinBatch } from 'apps/dashboard/features/pins/api/useExportPinBatch';
+import { useDeleteAllBatchPins } from 'apps/dashboard/features/pins/api/useDeleteAllBatchPins';
+import { useDeactivateAllBatchPins } from 'apps/dashboard/features/pins/api/useDeactivateAllBatchPins';
+import confirm from 'components/confirm/confirm';
+import { useApi } from 'hooks/useApi';
+import globalize from 'lib/globalize';
+import CreatePinBatchDialog from '../pinbatches/CreatePinBatchDialog';
+import EditPinBatchDialog from '../pinbatches/EditPinBatchDialog';
+import PinBatchDetailsDialog from '../pinbatches/PinBatchDetailsDialog';
 
-type PinStatus = 'active' | 'expired' | 'all';
+import type { PinBatch } from '../../types/pinBatch';
 
-type PinReport = {
-    Total: number;
-    Active: number;
-    Expired: number;
-    ByType: Array<{
-        SubscriptionType: number;
-        Total: number;
-        Active: number;
-        Expired: number;
-    }>;
-};
-
-const fetchPinUsers = async (apiClient: ApiClient, status?: string, subscriptionType?: number): Promise<UserDto[]> => {
-    const params: string[] = [];
-    if (status) params.push(`status=${encodeURIComponent(status)}`);
-    if (subscriptionType !== undefined) params.push(`subscriptionType=${subscriptionType}`);
-
-    const queryString = params.length > 0 ? `?${params.join('&')}` : '';
-    const url = `/Users/Pins${queryString}`;
-    const res = await apiClient.ajax({
-        type: 'GET',
-        url: apiClient.getUrl(url)
-    });
-
-    return res.json() as Promise<UserDto[]>;
-};
-
-const fetchPinReport = async (apiClient: ApiClient): Promise<PinReport> => {
-    const res = await apiClient.ajax({
-        type: 'GET',
-        url: apiClient.getUrl('/Users/PinReport')
-    });
-
-    return res.json() as Promise<PinReport>;
-};
-
-const generatePins = async (apiClient: ApiClient, count: number, subscriptionType: number): Promise<string[]> => {
-    const res = await apiClient.ajax({
-        type: 'POST',
-        url: apiClient.getUrl('/Users/GeneratePins'),
-        data: JSON.stringify({ Count: count, SubscriptionType: subscriptionType }),
-        contentType: 'application/json'
-    });
-
-    return res.json() as Promise<string[]>;
-};
-
-const exportPinReport = async (apiClient: ApiClient): Promise<void> => {
-    const response = await fetch(apiClient.getUrl('/Users/PinReport'), {
-        method: 'GET',
-        headers: {
-            'Authorization': `MediaBrowser Token="${apiClient.accessToken()}"`
-        }
-    });
-
-    if (!response.ok) {
-        throw new Error('Export failed');
+const getStatusText = (status: number): string => {
+    switch (status) {
+        case 0: return 'Active';
+        case 1: return 'Suspended';
+        case 2: return 'Expired';
+        case 3: return 'Deleted';
+        default: return 'Unknown';
     }
+};
 
-    const data = await response.json();
-
-    // Create CSV content
-    const csvContent = [
-        ['Metric', 'Value'],
-        ['Total PINs', data.Total],
-        ['Active PINs', data.Active],
-        ['Expired PINs', data.Expired],
-        [''],
-        ['Subscription Type', 'Total', 'Active', 'Expired'],
-        ...data.ByType.map((type: { SubscriptionType: number; Total: number; Active: number; Expired: number }) => [
-            getSubscriptionTypeText(type.SubscriptionType),
-            type.Total,
-            type.Active,
-            type.Expired
-        ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = `PIN_Report_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(downloadUrl);
+const getPatternText = (pattern: number): string => {
+    switch (pattern) {
+        case 0: return 'Numeric';
+        case 1: return 'Alphanumeric';
+        case 2: return 'Alphanumeric (Mixed)';
+        case 3: return 'Custom';
+        default: return 'Unknown';
+    }
 };
 
 const getSubscriptionTypeText = (type: number): string => {
@@ -149,332 +69,385 @@ const getSubscriptionTypeText = (type: number): string => {
 
 export const Component = () => {
     const { __legacyApiClient__ } = useApi();
-    const navigate = useNavigate();
-    const [tabValue, setTabValue] = useState(0);
-    const [status, setStatus] = useState<PinStatus>('active');
-    const [subscriptionType, setSubscriptionType] = useState<number | undefined>(undefined);
-    const [count, setCount] = useState<number>(10);
-    const [subTypeDraft, setSubTypeDraft] = useState<number>(0);
-    const [generatedPins, setGeneratedPins] = useState<string[] | null>(null);
-    const [errorMessage, setErrorMessage] = useState<string>('');
-    const [successMessage, setSuccessMessage] = useState<string>('');
+    const { data, isLoading } = usePinBatches(__legacyApiClient__!);
+    const batches = useMemo(() => (
+        data || []
+    ), [data]);
 
-    const { data: users, isLoading, refetch } = useQuery({
-        queryKey: ['Pins', 'Users', status, subscriptionType],
-        queryFn: () => fetchPinUsers(__legacyApiClient__!, status, subscriptionType)
-    });
+    const deletePinBatch = useDeletePinBatch();
+    const activatePinBatch = useActivatePinBatch();
+    const suspendPinBatch = useSuspendPinBatch();
+    const exportPinBatch = useExportPinBatch();
+    const deleteAllBatchPins = useDeleteAllBatchPins();
+    const deactivateAllBatchPins = useDeactivateAllBatchPins();
 
-    const { data: report, isLoading: reportLoading } = useQuery({
-        queryKey: ['PinReport'],
-        queryFn: () => fetchPinReport(__legacyApiClient__!)
-    });
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
+    const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+    const [selectedBatch, setSelectedBatch] = useState<PinBatch | null>(null);
 
-    const genMutation = useMutation({
-        mutationFn: () => generatePins(__legacyApiClient__!, count, subTypeDraft),
-        onSuccess: (pins: string[]) => {
-            setGeneratedPins(pins);
-            setSuccessMessage(`Generated ${pins.length} PINs successfully`);
-            void refetch();
+    const columns = useMemo<MRT_ColumnDef<PinBatch>[]>(() => [
+        {
+            id: 'Name',
+            accessorKey: 'Name',
+            header: 'Batch Name',
+            size: 200
         },
-        onError: (e: unknown) => {
-            const message = e instanceof Error ? e.message : String(e);
-            setErrorMessage(message || globalize.translate('MessageUnexpectedError'));
+        {
+            id: 'Description',
+            accessorKey: 'Description',
+            header: 'Description',
+            size: 250
+        },
+        {
+            id: 'Status',
+            accessorFn: item => getStatusText(item.Status),
+            header: 'Status',
+            size: 100
+        },
+        {
+            id: 'SubscriptionType',
+            accessorFn: item => getSubscriptionTypeText(item.SubscriptionType),
+            header: 'Subscription Type',
+            size: 150
+        },
+        {
+            id: 'PinPattern',
+            accessorFn: item => getPatternText(item.PinPattern),
+            header: 'PIN Pattern',
+            size: 150
+        },
+        {
+            id: 'TotalPins',
+            accessorKey: 'TotalPins',
+            header: 'Total PINs',
+            size: 100
+        },
+        {
+            id: 'ActivePins',
+            accessorKey: 'ActivePins',
+            header: 'Active PINs',
+            size: 100
+        },
+        {
+            id: 'UsedPins',
+            accessorKey: 'UsedPins',
+            header: 'Used PINs',
+            size: 100
+        },
+        {
+            id: 'CreatedDate',
+            accessorFn: item => item.CreatedDate ? new Date(item.CreatedDate).toLocaleString() : '',
+            header: 'Created Date',
+            size: 150
+        },
+        {
+            id: 'ExpirationDate',
+            accessorFn: item => item.ExpirationDate ? item.ExpirationDate : 'Lifetime',
+            header: 'Expiration Date',
+            filterVariant: 'datetime-range',
+            size: 150
+        }
+    ], []);
+
+    const table = useMaterialReactTable({
+        ...DEFAULT_TABLE_OPTIONS,
+
+        columns,
+        data: batches,
+
+        state: {
+            isLoading
+        },
+
+        // Enable (delete) row actions
+        enableRowActions: true,
+        positionActionsColumn: 'last',
+        displayColumnDefOptions: {
+            'mrt-row-actions': {
+                header: '',
+                size: 250
+            }
+        },
+
+        renderTopToolbarCustomActions: () => (
+            <Button
+                startIcon={<AddIcon />}
+                onClick={handleCreateClick}
+            >
+                Create PIN Batch
+            </Button>
+        ),
+
+        renderRowActions: ({ row }) => {
+            const batch = row.original;
+            return (
+                <Box sx={{ display: 'flex' }}>
+                    <Tooltip title='View Details'>
+                        <IconButton
+                            onClick={handleDetailsClickWrapper(batch)}
+                        >
+                            <VisibilityIcon />
+                        </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title='Edit'>
+                        <IconButton
+                            onClick={handleEditClickWrapper(batch)}
+                        >
+                            <VpnKeyIcon />
+                        </IconButton>
+                    </Tooltip>
+
+                    {renderStatusActions(batch)}
+
+                    <Tooltip title='Export'>
+                        <IconButton
+                            onClick={handleExportClickWrapper(batch.Id)}
+                        >
+                            <GetAppIcon />
+                        </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title='Deactivate All PINs'>
+                        <IconButton
+                            color='warning'
+                            onClick={handleDeactivateAllClickWrapper(batch.Id, batch.Name)}
+                        >
+                            <BlockIcon />
+                        </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title='Delete All PINs'>
+                        <IconButton
+                            color='error'
+                            onClick={handleDeleteAllClickWrapper(batch.Id, batch.Name)}
+                        >
+                            <ClearAllIcon />
+                        </IconButton>
+                    </Tooltip>
+
+                    <Tooltip title='Delete Batch'>
+                        <IconButton
+                            color='error'
+                            onClick={handleDeleteClickWrapper(batch.Id, batch.Name)}
+                        >
+                            <DeleteIcon />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
+            );
         }
     });
 
-    const exportMutation = useMutation({
-        mutationFn: () => exportPinReport(__legacyApiClient__!),
-        onSuccess: () => {
-            setSuccessMessage('PIN report exported successfully');
-        },
-        onError: (e: unknown) => {
-            const message = e instanceof Error ? e.message : String(e);
-            setErrorMessage(message || 'Export failed');
-        }
-    });
-
-    const handleErrorClose = useCallback(() => setErrorMessage(''), []);
-    const handleSuccessClose = useCallback(() => setSuccessMessage(''), []);
-    const handleDialogClose = useCallback(() => setGeneratedPins(null), []);
-
-    const canGenerate = useMemo(() => count > 0 && Number.isFinite(count), [count]);
-    const onGenerate = useCallback(() => {
+    const onDeleteBatch = useCallback((batchId: string, batchName: string) => {
         if (!__legacyApiClient__) return;
-        if (!canGenerate) {
-            setErrorMessage(globalize.translate('MessageInvalidValue'));
-            return;
+
+        confirm(`Are you sure you want to delete batch "${batchName}"?`, 'Confirm Delete Batch').then(function () {
+            deletePinBatch.mutate({
+                apiClient: __legacyApiClient__,
+                batchId: batchId
+            });
+        }).catch(err => {
+            console.error('[pinbatches] failed to show confirmation dialog', err);
+        });
+    }, [__legacyApiClient__, deletePinBatch]);
+
+    const onActivateBatch = useCallback((batchId: string) => {
+        if (!__legacyApiClient__) return;
+
+        activatePinBatch.mutate({
+            apiClient: __legacyApiClient__,
+            batchId: batchId
+        });
+    }, [__legacyApiClient__, activatePinBatch]);
+
+    const onSuspendBatch = useCallback((batchId: string) => {
+        if (!__legacyApiClient__) return;
+
+        suspendPinBatch.mutate({
+            apiClient: __legacyApiClient__,
+            batchId: batchId
+        });
+    }, [__legacyApiClient__, suspendPinBatch]);
+
+    const onExportBatch = useCallback((batchId: string) => {
+        if (!__legacyApiClient__) return;
+
+        const includeOriginalPins = window.confirm('Include original PINs in export? (This will show the actual PIN codes)');
+        exportPinBatch.mutate({
+            apiClient: __legacyApiClient__,
+            batchId: batchId,
+            includeOriginalPins: includeOriginalPins
+        });
+    }, [__legacyApiClient__, exportPinBatch]);
+
+    const onDeactivateAllBatchPins = useCallback((batchId: string, batchName: string) => {
+        if (!__legacyApiClient__) return;
+
+        confirm(`Are you sure you want to deactivate all PINs in batch "${batchName}"?`, 'Confirm Deactivate All PINs').then(function () {
+            deactivateAllBatchPins.mutate({
+                apiClient: __legacyApiClient__,
+                batchId: batchId
+            });
+        }).catch(err => {
+            console.error('[pinbatches] failed to show confirmation dialog', err);
+        });
+    }, [__legacyApiClient__, deactivateAllBatchPins]);
+
+    const onDeleteAllBatchPins = useCallback((batchId: string, batchName: string) => {
+        if (!__legacyApiClient__) return;
+
+        confirm(`Are you sure you want to delete all PINs in batch "${batchName}"? This action cannot be undone.`, 'Confirm Delete All PINs').then(function () {
+            deleteAllBatchPins.mutate({
+                apiClient: __legacyApiClient__,
+                batchId: batchId
+            });
+        }).catch(err => {
+            console.error('[pinbatches] failed to show confirmation dialog', err);
+        });
+    }, [__legacyApiClient__, deleteAllBatchPins]);
+
+    const handleCreateDialogClose = useCallback(() => {
+        setCreateDialogOpen(false);
+    }, []);
+
+    const handleEditDialogClose = useCallback(() => {
+        setEditDialogOpen(false);
+        setSelectedBatch(null);
+    }, []);
+
+    const handleDetailsDialogClose = useCallback(() => {
+        setDetailsDialogOpen(false);
+        setSelectedBatch(null);
+    }, []);
+
+    const handleCreateClick = useCallback(() => {
+        setCreateDialogOpen(true);
+    }, []);
+
+    const handleDetailsClick = useCallback((batch: PinBatch) => {
+        setSelectedBatch(batch);
+        setDetailsDialogOpen(true);
+    }, []);
+
+    const handleEditClick = useCallback((batch: PinBatch) => {
+        setSelectedBatch(batch);
+        setEditDialogOpen(true);
+    }, []);
+
+    const handleSuspendClick = useCallback((batchId: string) => {
+        onSuspendBatch(batchId);
+    }, [onSuspendBatch]);
+
+    const handleActivateClick = useCallback((batchId: string) => {
+        onActivateBatch(batchId);
+    }, [onActivateBatch]);
+
+    const handleExportClick = useCallback((batchId: string) => {
+        onExportBatch(batchId);
+    }, [onExportBatch]);
+
+    const handleDeactivateAllClick = useCallback((batchId: string, batchName: string) => {
+        onDeactivateAllBatchPins(batchId, batchName);
+    }, [onDeactivateAllBatchPins]);
+
+    const handleDeleteAllClick = useCallback((batchId: string, batchName: string) => {
+        onDeleteAllBatchPins(batchId, batchName);
+    }, [onDeleteAllBatchPins]);
+
+    const handleDeleteClick = useCallback((batchId: string, batchName: string) => {
+        onDeleteBatch(batchId, batchName);
+    }, [onDeleteBatch]);
+
+    const handleSuspendClickWrapper = useCallback((batchId: string) => {
+        return () => handleSuspendClick(batchId);
+    }, [handleSuspendClick]);
+
+    const handleActivateClickWrapper = useCallback((batchId: string) => {
+        return () => handleActivateClick(batchId);
+    }, [handleActivateClick]);
+
+    const renderStatusActions = useCallback((batch: PinBatch) => {
+        if (batch.Status === 0) {
+            return (
+                <Tooltip title='Suspend'>
+                    <IconButton
+                        onClick={handleSuspendClickWrapper(batch.Id)}
+                    >
+                        <PauseIcon />
+                    </IconButton>
+                </Tooltip>
+            );
         }
-        genMutation.mutate();
-    }, [genMutation, __legacyApiClient__, canGenerate]);
+        if (batch.Status === 1) {
+            return (
+                <Tooltip title='Activate'>
+                    <IconButton
+                        onClick={handleActivateClickWrapper(batch.Id)}
+                    >
+                        <PlayArrowIcon />
+                    </IconButton>
+                </Tooltip>
+            );
+        }
+        return null;
+    }, [handleSuspendClickWrapper, handleActivateClickWrapper]);
 
-    const onStatusChange = useCallback((value: PinStatus) => setStatus(value), []);
-    const onSubTypeFilterChange = useCallback((value: string) => setSubscriptionType(value === '' ? undefined : Number(value)), []);
-    const onCountChange = useCallback((value: string) => setCount(Number(value)), []);
-    const onSubTypeDraftChange = useCallback((value: string) => setSubTypeDraft(Number(value)), []);
+    const handleDetailsClickWrapper = useCallback((batch: PinBatch) => {
+        return () => handleDetailsClick(batch);
+    }, [handleDetailsClick]);
 
-    const handleCountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => onCountChange(e.target.value), [onCountChange]);
-    const handleSubTypeDraftChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => onSubTypeDraftChange(e.target.value), [onSubTypeDraftChange]);
-    const handleStatusChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => onStatusChange(e.target.value as PinStatus), [onStatusChange]);
-    const handleSubTypeFilterChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => onSubTypeFilterChange(e.target.value), [onSubTypeFilterChange]);
-    const handleTabChange = useCallback((event: React.SyntheticEvent, newValue: number) => setTabValue(newValue), []);
+    const handleEditClickWrapper = useCallback((batch: PinBatch) => {
+        return () => handleEditClick(batch);
+    }, [handleEditClick]);
 
-    const handleExportReport = useCallback(() => {
-        exportMutation.mutate();
-    }, [exportMutation]);
+    const handleExportClickWrapper = useCallback((batchId: string) => {
+        return () => handleExportClick(batchId);
+    }, [handleExportClick]);
 
-    const handleNavigateToBatches = useCallback(() => {
-        navigate('/dashboard/pinbatches');
-    }, [navigate]);
+    const handleDeactivateAllClickWrapper = useCallback((batchId: string, batchName: string) => {
+        return () => handleDeactivateAllClick(batchId, batchName);
+    }, [handleDeactivateAllClick]);
 
-    const handleNavigateToStatistics = useCallback(() => {
-        navigate('/dashboard/pinbatches/statistics');
-    }, [navigate]);
+    const handleDeleteAllClickWrapper = useCallback((batchId: string, batchName: string) => {
+        return () => handleDeleteAllClick(batchId, batchName);
+    }, [handleDeleteAllClick]);
+
+    const handleDeleteClickWrapper = useCallback((batchId: string, batchName: string) => {
+        return () => handleDeleteClick(batchId, batchName);
+    }, [handleDeleteClick]);
 
     return (
-        <Page id='pins' className='type-interior' title={globalize.translate('HeaderPins')}>
-            <Box className='content-primary'>
-                {errorMessage ? (
-                    <Alert severity='error' onClose={handleErrorClose} sx={{ mb: 2 }}>
-                        {errorMessage}
-                    </Alert>
-                ) : null}
-                
-                {successMessage ? (
-                    <Alert severity='success' onClose={handleSuccessClose} sx={{ mb: 2 }}>
-                        {successMessage}
-                    </Alert>
-                ) : null}
+        <TablePage
+            id='pinBatchesPage'
+            title={globalize.translate('HeaderPinBatches')}
+            subtitle={globalize.translate('HeaderPinBatchesHelp')}
+            className='mainAnimatedPage type-interior'
+            table={table}
+        >
+            <CreatePinBatchDialog
+                open={createDialogOpen}
+                onClose={handleCreateDialogClose}
+            />
 
-                <Stack direction='row' justifyContent='space-between' alignItems='center' mb={2}>
-                    <Typography variant='h5'>{globalize.translate('HeaderPins')}</Typography>
-                    <Stack direction='row' gap={2}>
-                        <Button
-                            variant='outlined'
-                            startIcon={<ViewListIcon />}
-                            onClick={handleNavigateToBatches}
-                        >
-                            Manage Batches
-                        </Button>
-                        <Button
-                            variant='outlined'
-                            startIcon={<AssessmentIcon />}
-                            onClick={handleNavigateToStatistics}
-                        >
-                            Statistics
-                        </Button>
-                        <Button
-                            variant='outlined'
-                            startIcon={<GetAppIcon />}
-                            onClick={handleExportReport}
-                            disabled={exportMutation.isPending}
-                        >
-                            Export Report
-                        </Button>
-                    </Stack>
-                </Stack>
+            {selectedBatch && (
+                <EditPinBatchDialog
+                    open={editDialogOpen}
+                    onClose={handleEditDialogClose}
+                    batch={selectedBatch}
+                />
+            )}
 
-                <Tabs value={tabValue} onChange={handleTabChange} sx={{ mb: 3 }}>
-                    <Tab label='PIN Management' />
-                    <Tab label='Overview' />
-                </Tabs>
-
-                {tabValue === 0 && (
-                    <>
-                        <Stack direction='row' justifyContent='space-between' alignItems='center' mb={2}>
-                            <Typography variant='h6'>Generate New PINs</Typography>
-                            <Stack direction='row' gap={2}>
-                                <TextField 
-                                    label={globalize.translate('LabelCount')} 
-                                    type='number' 
-                                    value={count} 
-                                    onChange={handleCountChange} 
-                                    size='small' 
-                                />
-                                <TextField 
-                                    label={globalize.translate('LabelSubscriptionType')} 
-                                    select 
-                                    value={subTypeDraft} 
-                                    onChange={handleSubTypeDraftChange} 
-                                    size='small' 
-                                    sx={{ minWidth: 180 }}
-                                >
-                                    <MenuItem value={0}>{globalize.translate('OptionSubscriptionBasic')}</MenuItem>
-                                    <MenuItem value={1}>{globalize.translate('OptionSubscriptionPremium')}</MenuItem>
-                                </TextField>
-                                <Button 
-                                    variant='contained' 
-                                    onClick={onGenerate} 
-                                    disabled={genMutation.isPending || !canGenerate}
-                                    startIcon={<AddIcon />}
-                                >
-                                    {genMutation.isPending ? globalize.translate('ButtonPleaseWait') : globalize.translate('ButtonGenerate')}
-                                </Button>
-                            </Stack>
-                        </Stack>
-
-                        <Stack direction='row' gap={2} mb={2}>
-                            <TextField 
-                                label={globalize.translate('LabelStatus')} 
-                                select 
-                                value={status} 
-                                onChange={handleStatusChange} 
-                                size='small' 
-                                sx={{ minWidth: 160 }}
-                            >
-                                <MenuItem value='active'>{globalize.translate('OptionActive')}</MenuItem>
-                                <MenuItem value='expired'>{globalize.translate('OptionExpired')}</MenuItem>
-                                <MenuItem value='all'>{globalize.translate('OptionAll')}</MenuItem>
-                            </TextField>
-                            <TextField 
-                                label={globalize.translate('LabelSubscriptionType')} 
-                                select 
-                                value={subscriptionType ?? ''} 
-                                onChange={handleSubTypeFilterChange} 
-                                size='small' 
-                                sx={{ minWidth: 180 }}
-                            >
-                                <MenuItem value=''>{globalize.translate('OptionAny')}</MenuItem>
-                                <MenuItem value={0}>{globalize.translate('OptionSubscriptionBasic')}</MenuItem>
-                                <MenuItem value={1}>{globalize.translate('OptionSubscriptionPremium')}</MenuItem>
-                            </TextField>
-                        </Stack>
-
-                        {isLoading ? (
-                            <Box display='flex' justifyContent='center' p={4}>
-                                <CircularProgress />
-                            </Box>
-                        ) : (
-                            <Table>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>ID</TableCell>
-                                        <TableCell>Name</TableCell>
-                                        <TableCell>Username</TableCell>
-                                        <TableCell>Status</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {users?.map((user) => (
-                                        <TableRow key={user.Id}>
-                                            <TableCell>{user.Id}</TableCell>
-                                            <TableCell>{user.Name}</TableCell>
-                                            <TableCell>{user.Username || 'N/A'}</TableCell>
-                                            <TableCell>
-                                                <Chip 
-                                                    label={status === 'expired' ? 'Expired' : 'Active'} 
-                                                    color={status === 'expired' ? 'error' : 'success'} 
-                                                    size='small' 
-                                                />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-
-                        {users?.length === 0 && !isLoading && (
-                            <Box textAlign='center' p={4}>
-                                <Typography variant='h6' color='text.secondary'>
-                                    No PIN users found
-                                </Typography>
-                                <Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
-                                    Generate some PINs to get started
-                                </Typography>
-                            </Box>
-                        )}
-                    </>
-                )}
-
-                {tabValue === 1 && (
-                    <>
-                        <Typography variant='h6' gutterBottom>PIN Overview</Typography>
-                        {reportLoading ? (
-                            <Box display='flex' justifyContent='center' p={4}>
-                                <CircularProgress />
-                            </Box>
-                        ) : report ? (
-                            <Grid container spacing={3}>
-                                <Grid item xs={12} sm={6} md={3}>
-                                    <Card>
-                                        <CardContent>
-                                            <Typography variant='h4' color='primary'>{report.Total}</Typography>
-                                            <Typography variant='body2' color='text.secondary'>Total PINs</Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={3}>
-                                    <Card>
-                                        <CardContent>
-                                            <Typography variant='h4' color='success.main'>{report.Active}</Typography>
-                                            <Typography variant='body2' color='text.secondary'>Active PINs</Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={3}>
-                                    <Card>
-                                        <CardContent>
-                                            <Typography variant='h4' color='error.main'>{report.Expired}</Typography>
-                                            <Typography variant='body2' color='text.secondary'>Expired PINs</Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                                <Grid item xs={12} sm={6} md={3}>
-                                    <Card>
-                                        <CardContent>
-                                            <Typography variant='h4' color='info.main'>
-                                                {report.Total > 0 ? Math.round((report.Active / report.Total) * 100) : 0}%
-                                            </Typography>
-                                            <Typography variant='body2' color='text.secondary'>Active Rate</Typography>
-                                        </CardContent>
-                                    </Card>
-                                </Grid>
-                                
-                                <Grid item xs={12}>
-                                    <Typography variant='h6' gutterBottom sx={{ mt: 2 }}>By Subscription Type</Typography>
-                                    <Table>
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell>Subscription Type</TableCell>
-                                                <TableCell align='right'>Total</TableCell>
-                                                <TableCell align='right'>Active</TableCell>
-                                                <TableCell align='right'>Expired</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {report.ByType?.map((type, index) => (
-                                                <TableRow key={index}>
-                                                    <TableCell>{getSubscriptionTypeText(type.SubscriptionType)}</TableCell>
-                                                    <TableCell align='right'>{type.Total}</TableCell>
-                                                    <TableCell align='right'>{type.Active}</TableCell>
-                                                    <TableCell align='right'>{type.Expired}</TableCell>
-                                                </TableRow>
-                                            )) || []}
-                                        </TableBody>
-                                    </Table>
-                                </Grid>
-                            </Grid>
-                        ) : (
-                            <Alert severity='error'>Failed to load PIN report</Alert>
-                        )}
-                    </>
-                )}
-
-                <Dialog open={generatedPins !== null} onClose={handleDialogClose} maxWidth='sm' fullWidth>
-                    <DialogTitle>Generated PINs</DialogTitle>
-                    <DialogContent>
-                        <Typography variant='body2' color='text.secondary' gutterBottom>
-                            The following PINs have been generated and users created:
-                        </Typography>
-                        <List>
-                            {generatedPins?.map((pin, index) => (
-                                <ListItem key={index}>
-                                    <Typography variant='body1' fontFamily='monospace'>{pin}</Typography>
-                                </ListItem>
-                            ))}
-                        </List>
-                    </DialogContent>
-                </Dialog>
-            </Box>
-        </Page>
+            {selectedBatch && (
+                <PinBatchDetailsDialog
+                    open={detailsDialogOpen}
+                    onClose={handleDetailsDialogClose}
+                    batch={selectedBatch}
+                />
+            )}
+        </TablePage>
     );
 };
+
+Component.displayName = 'PinBatchesPage';

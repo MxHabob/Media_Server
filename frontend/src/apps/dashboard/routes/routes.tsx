@@ -3,6 +3,7 @@ import { Navigate, RouteObject } from 'react-router-dom';
 
 import ConnectionRequired from 'components/ConnectionRequired';
 import { ASYNC_ADMIN_ROUTES } from './_asyncRoutes';
+import { ASYNC_PIN_CONTROL_ROUTES } from './_pinControlRoutes';
 import { toAsyncPageRoute } from 'components/router/AsyncRoute';
 import { toViewManagerPageRoute } from 'components/router/LegacyRoute';
 import { LEGACY_ADMIN_ROUTES } from './_legacyRoutes';
@@ -47,6 +48,23 @@ export const DASHBOARD_APP_ROUTES: RouteObject[] = [
                     {
                         path: DASHBOARD_APP_PATHS.PluginConfig,
                         element: <ServerContentPage view='/web/configurationpage' />
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        element: <ConnectionRequired level='pincontrol' />,
+        children: [
+            {
+                lazy: () => import('../AppLayout'),
+                children: [
+                    {
+                        path: DASHBOARD_APP_PATHS.Dashboard,
+                        children: [
+                            ...ASYNC_PIN_CONTROL_ROUTES.map(toAsyncPageRoute)
+                        ],
+                        errorElement: <ErrorBoundary pageClasses={[ 'type-interior' ]} />
                     }
                 ]
             }
