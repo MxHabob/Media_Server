@@ -335,7 +335,7 @@ export const Component = () => {
         renderRowActions: ({ row }) => {
             return (
                 <Box sx={{ display: 'flex' }}>
-                    <Tooltip title={globalize.translate('ButtonCreatePinBatch')}>
+                    <Tooltip title={globalize.translate('Create')}>
                         <IconButton
                             color='primary'
                             onClick={() => onCreatePinBatch(row.original)}
@@ -343,7 +343,7 @@ export const Component = () => {
                             <VpnKeyIcon />
                         </IconButton>
                     </Tooltip>
-                    <Tooltip title={globalize.translate('ButtonEdit')}>
+                    <Tooltip title={globalize.translate('Edit')}>
                         <IconButton
                             color='primary'
                             onClick={() => onEdit(row.original)}
@@ -351,7 +351,7 @@ export const Component = () => {
                             <EditIcon />
                         </IconButton>
                     </Tooltip>
-                    <Tooltip title={globalize.translate('ButtonDelete')}>
+                    <Tooltip title={globalize.translate('Delete')}>
                         <IconButton
                             color='error'
                             onClick={() => onDelete(row.original.Id!)}
