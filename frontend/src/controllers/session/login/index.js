@@ -10,7 +10,6 @@ import dom from '../../../utils/dom';
 import loading from '../../../components/loading/loading';
 import layoutManager from '../../../components/layoutManager';
 import libraryMenu from '../../../scripts/libraryMenu';
-import browser from '../../../scripts/browser';
 import globalize from '../../../lib/globalize';
 import '../../../components/cardbuilder/card.scss';
 import '../../../elements/emby-checkbox/emby-checkbox';
@@ -19,11 +18,7 @@ import toast from '../../../components/toast/toast';
 import dialogHelper from '../../../components/dialogHelper/dialogHelper';
 import prompt from '../../../components/prompt/prompt';
 import baseAlert from '../../../components/alert';
-import { getDefaultBackgroundClass } from '../../../components/cardbuilder/cardBuilderUtils';
-
 import './login.scss';
-
-const enableFocusTransform = !browser.slow && !browser.edge;
 
 async function authenticateUserByName(page, apiClient, url, username, password) {
     loading.show();
@@ -286,55 +281,6 @@ function showManualForm(context, showCancel, focusPassword) {
     }
 }
 
-function loadUserList(context, apiClient, users) {
-    let html = '';
-
-    for (const user of users) {
-        // TODO move card creation code to Card component
-        let cssClass = 'card squareCard scalableCard squareCard-scalable';
-
-        if (layoutManager.tv) {
-            cssClass += ' show-focus';
-
-            if (enableFocusTransform) {
-                cssClass += ' show-animation';
-            }
-        }
-
-        const cardBoxCssClass = 'cardBox cardBox-bottompadded';
-        html += '<button type="button" class="' + cssClass + '">';
-        html += '<div class="' + cardBoxCssClass + '">';
-        html += '<div class="cardScalable">';
-        html += '<div class="cardPadder cardPadder-square"></div>';
-        html += `<div class="cardContent" data-haspw="${user.HasPassword}" data-username="${user.Name}" data-userid="${user.Id}">`;
-        let imgUrl;
-
-        if (user.PrimaryImageTag) {
-            imgUrl = apiClient.getUserImageUrl(user.Id, {
-                width: 300,
-                tag: user.PrimaryImageTag,
-                type: 'Primary'
-            });
-
-            html += '<div class="cardImageContainer coveredImage" style="background-image:url(\'' + imgUrl + "');\"></div>";
-        } else {
-            html += `<div class="cardImage flex align-items-center justify-content-center ${getDefaultBackgroundClass()}">`;
-            html += '<span class="material-icons cardImageIcon person" aria-hidden="true"></span>';
-            html += '</div>';
-        }
-
-        html += '</div>';
-        html += '</div>';
-        html += '<div class="cardFooter visualCardBox-cardFooter">';
-        html += '<div class="cardText singleCardText cardTextCentered">' + user.Name + '</div>';
-        html += '</div>';
-        html += '</div>';
-        html += '</button>';
-    }
-
-    context.querySelector('#divUsers').innerHTML = html;
-}
-
 export default function (view, params) {
     // Check for PIN expiration on page load
     checkPinExpirationOnLoad();
@@ -420,7 +366,6 @@ export default function (view, params) {
     });
 
     view.addEventListener('viewshow', function () {
-        loading.show();
         libraryMenu.setTransparentMenu(true);
 
         if (!appHost.supports(AppFeature.MultiServer)) {
@@ -439,17 +384,6 @@ export default function (view, params) {
                 console.debug('Failed to get QuickConnect status');
             });
 
-        apiClient.getPublicUsers().then(function (users) {
-            if (users.length) {
-                showVisualForm();
-                loadUserList(view, apiClient, users);
-            } else {
-                view.querySelector('#txtManualName').value = '';
-                showManualForm(view, false, false);
-            }
-        }).catch().then(function () {
-            loading.hide();
-        });
         apiClient.getJSON(apiClient.getUrl('Branding/Configuration')).then(function (options) {
             const loginDisclaimer = view.querySelector('.loginDisclaimer');
 

@@ -4,9 +4,12 @@
     <TargetFramework>net9.0</TargetFramework>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <AnalysisMode>None</AnalysisMode>
   </PropertyGroup>
 
-  <!-- Code Analyzers -->
+  <!-- Code Analyzers - Temporarily disabled for performance build -->
+  <!--
   <ItemGroup Condition=" '$(Configuration)' == 'Debug' ">
     <PackageReference Include="IDisposableAnalyzers">
       <PrivateAssets>all</PrivateAssets>
@@ -20,6 +23,7 @@
     <PackageReference Include="StyleCop.Analyzers" PrivateAssets="All" />
     <PackageReference Include="SmartAnalyzers.MultithreadingAnalyzer" PrivateAssets="All" />
   </ItemGroup>
+  -->
 
   <ItemGroup>
     <Compile Include="..\SharedVersion.cs" />

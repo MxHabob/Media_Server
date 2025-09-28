@@ -131,6 +131,22 @@ function processGeneralCommand(cmd, apiClient) {
         case 'SendString':
             focusManager.sendText(cmd.Arguments.String);
             break;
+        case 'PinBatchCreated':
+            console.log('PIN batch created:', cmd.Arguments);
+            Events.trigger(serverNotifications, 'PinBatchCreated', [apiClient, cmd.Arguments]);
+            break;
+        case 'PinBatchDeleted':
+            console.log('PIN batch deleted:', cmd.Arguments);
+            Events.trigger(serverNotifications, 'PinBatchDeleted', [apiClient, cmd.Arguments]);
+            break;
+        case 'PinUsed':
+            console.log('PIN used:', cmd.Arguments);
+            Events.trigger(serverNotifications, 'PinUsed', [apiClient, cmd.Arguments]);
+            break;
+        case 'PinExpired':
+            console.log('PIN expired:', cmd.Arguments);
+            Events.trigger(serverNotifications, 'PinExpired', [apiClient, cmd.Arguments]);
+            break;
         default:
             console.debug('processGeneralCommand does not recognize: ' + cmd.Name);
             break;

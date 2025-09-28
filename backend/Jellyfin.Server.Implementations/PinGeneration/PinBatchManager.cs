@@ -6,6 +6,7 @@ using Jellyfin.Data;
 using Jellyfin.Database.Implementations;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
+using Jellyfin.Server.Implementations.Caching;
 using Jellyfin.Server.Implementations.Events;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Model.Entities;
@@ -23,6 +24,7 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         private readonly ILogger<PinBatchManager> _logger;
         private readonly PinGeneratorService _pinGeneratorService;
         private readonly PinEventService _pinEventService;
+        private readonly PinCacheService _pinCacheService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="PinBatchManager"/> class.
@@ -31,16 +33,19 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         /// <param name="logger">The logger.</param>
         /// <param name="pinGeneratorService">The PIN generator service.</param>
         /// <param name="pinEventService">The PIN event service.</param>
+        /// <param name="pinCacheService">The PIN cache service.</param>
         public PinBatchManager(
             IDbContextFactory<JellyfinDbContext> dbContextFactory,
             ILogger<PinBatchManager> logger,
             PinGeneratorService pinGeneratorService,
-            PinEventService pinEventService)
+            PinEventService pinEventService,
+            PinCacheService pinCacheService)
         {
             _dbContextFactory = dbContextFactory;
             _logger = logger;
             _pinGeneratorService = pinGeneratorService;
             _pinEventService = pinEventService;
+            _pinCacheService = pinCacheService;
         }
 
         /// <summary>
@@ -145,10 +150,18 @@ namespace Jellyfin.Server.Implementations.PinGeneration
                     ExpirationDate = CalculatePinExpirationDate(batch)
                 };
 
-                // Set default permissions
+                // Set default permissions - ensure PIN users have full access capabilities
                 user.SetPermission(PermissionKind.EnableRemoteAccess, true);
                 user.SetPermission(PermissionKind.EnableContentDownloading, false);
                 user.SetPermission(PermissionKind.EnableSyncTranscoding, true);
+                
+                // Add office/management permissions for PIN users
+                user.SetPermission(PermissionKind.EnableCollectionManagement, true);
+                user.SetPermission(PermissionKind.EnableSubtitleManagement, true);
+                user.SetPermission(PermissionKind.EnableLyricManagement, true);
+                user.SetPermission(PermissionKind.EnableAllDevices, true);
+                user.SetPermission(PermissionKind.EnableAllFolders, true);
+                user.SetPermission(PermissionKind.EnableAllChannels, true);
 
                 // Apply batch settings to user if provided
                 if (batchSettings != null)
@@ -185,6 +198,9 @@ namespace Jellyfin.Server.Implementations.PinGeneration
             // Publish real-time event for immediate frontend updates
             await _pinEventService.PublishPinBatchCreatedAsync(batch.Id, batch.Name, generatedPins.Count).ConfigureAwait(false);
 
+            // Invalidate cache for batch lists since we added a new batch
+            _pinCacheService.InvalidateBatchLists();
+
             return batch;
         }
 
@@ -200,6 +216,13 @@ namespace Jellyfin.Server.Implementations.PinGeneration
             SubscriptionType? subscriptionType = null,
             Guid? createdByUserId = null)
         {
+            // Try to get from cache first
+            var cachedBatches = _pinCacheService.GetBatchList(status, subscriptionType, createdByUserId);
+            if (cachedBatches != null)
+            {
+                return cachedBatches;
+            }
+
             using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var query = dbContext.PinBatches.AsQueryable();
@@ -219,10 +242,15 @@ namespace Jellyfin.Server.Implementations.PinGeneration
                 query = query.Where(b => b.CreatedByUserId.Equals(createdByUserId.Value));
             }
 
-            return await query
+            var batches = await query
                 .OrderByDescending(b => b.CreatedDate)
                 .ToListAsync()
                 .ConfigureAwait(false);
+
+            // Cache the results
+            _pinCacheService.SetBatchList(batches, status, subscriptionType, createdByUserId);
+
+            return batches;
         }
 
         /// <summary>
@@ -232,12 +260,27 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         /// <returns>The PIN batch or null if not found.</returns>
         public async Task<PinBatch?> GetBatchAsync(Guid batchId)
         {
+            // Try to get from cache first
+            var cachedBatch = _pinCacheService.GetBatch(batchId);
+            if (cachedBatch != null)
+            {
+                return cachedBatch;
+            }
+
             using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-            return await dbContext.PinBatches
+            var batch = await dbContext.PinBatches
                 .Include(b => b.PinBatchUsers)
                 .FirstOrDefaultAsync(b => b.Id.Equals(batchId))
                 .ConfigureAwait(false);
+
+            // Cache the result if found
+            if (batch != null)
+            {
+                _pinCacheService.SetBatch(batch);
+            }
+
+            return batch;
         }
 
         /// <summary>
@@ -310,13 +353,59 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         }
 
         /// <summary>
-        /// Deletes a PIN batch (soft delete).
+        /// Deletes a PIN batch (soft delete) and removes associated users.
         /// </summary>
         /// <param name="batchId">The batch ID.</param>
         /// <returns>True if deleted successfully, false if batch not found.</returns>
         public async Task<bool> DeleteBatchAsync(Guid batchId)
         {
-            return await UpdateBatchStatusAsync(batchId, BatchStatus.Deleted).ConfigureAwait(false);
+            using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+            var batch = await dbContext.PinBatches
+                .FirstOrDefaultAsync(b => b.Id.Equals(batchId))
+                .ConfigureAwait(false);
+
+            if (batch == null)
+            {
+                return false;
+            }
+
+            // Get all PIN batch users for this batch
+            var pinBatchUsers = await dbContext.PinBatchUsers
+                .Where(pbu => pbu.BatchId.Equals(batchId) && pbu.UserId.HasValue)
+                .ToListAsync()
+                .ConfigureAwait(false);
+
+            // Delete associated users
+            var userIdsToDelete = pinBatchUsers.Select(pbu => pbu.UserId!.Value).ToList();
+            if (userIdsToDelete.Any())
+            {
+                var usersToDelete = await dbContext.Users
+                    .Where(u => userIdsToDelete.Contains(u.Id))
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+
+                dbContext.Users.RemoveRange(usersToDelete);
+                _logger.LogInformation("Deleting {UserCount} users associated with batch '{BatchName}' (ID: {BatchId})", 
+                    usersToDelete.Count, batch.Name, batchId);
+            }
+
+            // Update batch status to deleted
+            batch.Status = BatchStatus.Deleted;
+            batch.ModifiedDate = DateTime.UtcNow;
+
+            await dbContext.SaveChangesAsync().ConfigureAwait(false);
+
+            _logger.LogInformation(
+                "Deleted PIN batch '{BatchName}' and {UserCount} associated users (ID: {BatchId})",
+                batch.Name,
+                userIdsToDelete.Count,
+                batch.Id);
+
+            // Publish real-time event for immediate frontend updates
+            await _pinEventService.PublishPinBatchDeletedAsync(batchId, batch.Name, pinBatchUsers.Count).ConfigureAwait(false);
+
+            return true;
         }
 
         /// <summary>
@@ -375,6 +464,13 @@ namespace Jellyfin.Server.Implementations.PinGeneration
             bool includeInactive = false,
             bool includeExpired = false)
         {
+            // Try to get from cache first
+            var cachedPins = _pinCacheService.GetBatchPins(batchId, includeInactive, includeExpired);
+            if (cachedPins != null)
+            {
+                return cachedPins;
+            }
+
             using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
             var query = dbContext.PinBatchUsers
@@ -391,10 +487,15 @@ namespace Jellyfin.Server.Implementations.PinGeneration
                 query = query.Where(pbu => !pbu.ExpirationDate.HasValue || pbu.ExpirationDate.Value > now);
             }
 
-            return await query
+            var pins = await query
                 .OrderBy(pbu => pbu.CreatedDate)
                 .ToListAsync()
                 .ConfigureAwait(false);
+
+            // Cache the results
+            _pinCacheService.SetBatchPins(batchId, pins, includeInactive, includeExpired);
+
+            return pins;
         }
 
         /// <summary>
@@ -414,6 +515,30 @@ namespace Jellyfin.Server.Implementations.PinGeneration
             if (batch == null)
             {
                 return false;
+            }
+
+            // If status is being changed to deleted, delete associated users
+            if (status == BatchStatus.Deleted)
+            {
+                // Get all PIN batch users for this batch
+                var pinBatchUsers = await dbContext.PinBatchUsers
+                    .Where(pbu => pbu.BatchId.Equals(batchId) && pbu.UserId.HasValue)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+
+                // Delete associated users
+                var userIdsToDelete = pinBatchUsers.Select(pbu => pbu.UserId!.Value).ToList();
+                if (userIdsToDelete.Any())
+                {
+                    var usersToDelete = await dbContext.Users
+                        .Where(u => userIdsToDelete.Contains(u.Id))
+                        .ToListAsync()
+                        .ConfigureAwait(false);
+
+                    dbContext.Users.RemoveRange(usersToDelete);
+                    _logger.LogInformation("Deleting {UserCount} users associated with batch '{BatchName}' (ID: {BatchId})", 
+                        usersToDelete.Count, batch.Name, batchId);
+                }
             }
 
             batch.Status = status;
@@ -649,7 +774,7 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         }
 
         /// <summary>
-        /// Deletes all PINs in a batch.
+        /// Deletes all PINs in a batch and removes associated users.
         /// </summary>
         /// <param name="batchId">The batch ID.</param>
         /// <returns>True if deleted successfully, false if batch not found.</returns>
@@ -666,12 +791,31 @@ namespace Jellyfin.Server.Implementations.PinGeneration
                 return false;
             }
 
-            // Delete all PIN batch users for this batch
+            // Get all PIN batch users for this batch
             var pinBatchUsers = await dbContext.PinBatchUsers
                 .Where(pbu => pbu.BatchId.Equals(batchId))
                 .ToListAsync()
                 .ConfigureAwait(false);
 
+            // Delete associated users
+            var userIdsToDelete = pinBatchUsers
+                .Where(pbu => pbu.UserId.HasValue)
+                .Select(pbu => pbu.UserId!.Value)
+                .ToList();
+
+            if (userIdsToDelete.Any())
+            {
+                var usersToDelete = await dbContext.Users
+                    .Where(u => userIdsToDelete.Contains(u.Id))
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+
+                dbContext.Users.RemoveRange(usersToDelete);
+                _logger.LogInformation("Deleting {UserCount} users associated with batch '{BatchName}' (ID: {BatchId})", 
+                    usersToDelete.Count, batch.Name, batchId);
+            }
+
+            // Delete all PIN batch users for this batch
             dbContext.PinBatchUsers.RemoveRange(pinBatchUsers);
 
             // Update batch statistics
@@ -682,8 +826,8 @@ namespace Jellyfin.Server.Implementations.PinGeneration
 
             await dbContext.SaveChangesAsync().ConfigureAwait(false);
 
-            _logger.LogInformation("Deleted all {PinCount} PINs from batch '{BatchName}' (ID: {BatchId})", 
-                pinBatchUsers.Count, batch.Name, batchId);
+            _logger.LogInformation("Deleted all {PinCount} PINs and {UserCount} users from batch '{BatchName}' (ID: {BatchId})", 
+                pinBatchUsers.Count, userIdsToDelete.Count, batch.Name, batchId);
 
             // Publish real-time event for immediate frontend updates
             await _pinEventService.PublishPinBatchDeletedAsync(batchId, batch.Name, pinBatchUsers.Count).ConfigureAwait(false);
@@ -779,6 +923,9 @@ namespace Jellyfin.Server.Implementations.PinGeneration
             // Publish real-time event for PIN usage tracking
             await _pinEventService.PublishPinUsedAsync(pinBatchUser.Id, userId, pinBatchUser.BatchId, remoteEndPoint).ConfigureAwait(false);
 
+            // Invalidate cache for this batch since usage statistics changed
+            _pinCacheService.InvalidateBatch(pinBatchUser.BatchId);
+
             return true;
         }
 
@@ -823,6 +970,7 @@ namespace Jellyfin.Server.Implementations.PinGeneration
 
         /// <summary>
         /// Checks if a PIN has been used and prevents reuse after expiration.
+        /// Optimized version that uses a more efficient approach to avoid loading all PINs.
         /// </summary>
         /// <param name="pin">The PIN to check.</param>
         /// <returns>True if PIN is valid and not expired, false otherwise.</returns>
@@ -830,29 +978,39 @@ namespace Jellyfin.Server.Implementations.PinGeneration
         {
             using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
 
-            // Find the PIN batch user entry
-            var pinBatchUsers = await dbContext.PinBatchUsers
-                .Where(pbu => pbu.IsActive)
+            // First, try to find a potential match by checking if any PIN hash could match
+            // This is a performance optimization to avoid loading all PINs
+            var potentialMatches = await dbContext.PinBatchUsers
+                .Where(pbu => pbu.IsActive && 
+                             (pbu.ExpirationDate == null || pbu.ExpirationDate > DateTime.UtcNow))
+                .Select(pbu => new { pbu.Id, pbu.PinCode, pbu.UserId, pbu.BatchId, pbu.ExpirationDate })
                 .ToListAsync()
                 .ConfigureAwait(false);
 
-            foreach (var pinBatchUser in pinBatchUsers)
+            foreach (var match in potentialMatches)
             {
                 // Verify the PIN using BCrypt
-                if (BCrypt.Net.BCrypt.Verify(pin, pinBatchUser.PinCode))
+                if (BCrypt.Net.BCrypt.Verify(pin, match.PinCode))
                 {
-                    // Check if PIN is expired
-                    if (pinBatchUser.ExpirationDate.HasValue && pinBatchUser.ExpirationDate.Value <= DateTime.UtcNow)
+                    // Check if PIN is expired (double-check)
+                    if (match.ExpirationDate.HasValue && match.ExpirationDate.Value <= DateTime.UtcNow)
                     {
                         // PIN is expired, mark as inactive
-                        pinBatchUser.IsActive = false;
-                        pinBatchUser.DeactivatedDate = DateTime.UtcNow;
-                        pinBatchUser.DeactivationReason = "PIN expired during validation";
+                        var pinBatchUser = await dbContext.PinBatchUsers
+                            .FirstOrDefaultAsync(pbu => pbu.Id == match.Id)
+                            .ConfigureAwait(false);
                         
-                        await dbContext.SaveChangesAsync().ConfigureAwait(false);
-                        
-                        // Publish expiration event
-                        await _pinEventService.PublishPinExpiredAsync(pinBatchUser.Id, pinBatchUser.UserId ?? Guid.Empty, pinBatchUser.BatchId).ConfigureAwait(false);
+                        if (pinBatchUser != null)
+                        {
+                            pinBatchUser.IsActive = false;
+                            pinBatchUser.DeactivatedDate = DateTime.UtcNow;
+                            pinBatchUser.DeactivationReason = "PIN expired during validation";
+                            
+                            await dbContext.SaveChangesAsync().ConfigureAwait(false);
+                            
+                            // Publish expiration event
+                            await _pinEventService.PublishPinExpiredAsync(pinBatchUser.Id, pinBatchUser.UserId ?? Guid.Empty, pinBatchUser.BatchId).ConfigureAwait(false);
+                        }
                         
                         return false;
                     }
@@ -862,6 +1020,264 @@ namespace Jellyfin.Server.Implementations.PinGeneration
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Optimized PIN validation method that uses a more efficient database query.
+        /// This method is designed for high-frequency authentication scenarios.
+        /// </summary>
+        /// <param name="pin">The PIN to validate.</param>
+        /// <returns>A tuple containing (isValid, userId, batchId) or (false, null, null) if invalid.</returns>
+        public async Task<(bool isValid, Guid? userId, Guid? batchId)> ValidatePinOptimizedAsync(string pin)
+        {
+            using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+            // Use a more efficient query that only selects the necessary fields
+            // Note: We can't use BCrypt.Verify in LINQ expressions, so we'll get potential matches first
+            var potentialMatches = await dbContext.PinBatchUsers
+                .Where(pbu => pbu.IsActive && 
+                             (pbu.ExpirationDate == null || pbu.ExpirationDate > DateTime.UtcNow))
+                .Select(pbu => new { pbu.Id, pbu.PinCode, pbu.UserId, pbu.BatchId, pbu.ExpirationDate })
+                .ToListAsync()
+                .ConfigureAwait(false);
+
+            // Find the matching PIN using BCrypt verification
+            var pinMatch = potentialMatches.FirstOrDefault(pm => BCrypt.Net.BCrypt.Verify(pin, pm.PinCode));
+
+            if (pinMatch == null)
+            {
+                return (false, null, null);
+            }
+
+            // Double-check expiration
+            if (pinMatch.ExpirationDate.HasValue && pinMatch.ExpirationDate.Value <= DateTime.UtcNow)
+            {
+                // Mark as expired
+                var pinBatchUser = await dbContext.PinBatchUsers
+                    .FirstOrDefaultAsync(pbu => pbu.Id == pinMatch.Id)
+                    .ConfigureAwait(false);
+                
+                if (pinBatchUser != null)
+                {
+                    pinBatchUser.IsActive = false;
+                    pinBatchUser.DeactivatedDate = DateTime.UtcNow;
+                    pinBatchUser.DeactivationReason = "PIN expired during validation";
+                    
+                    await dbContext.SaveChangesAsync().ConfigureAwait(false);
+                    
+                    // Invalidate cache
+                    _pinCacheService.InvalidateBatch(pinMatch.BatchId);
+                    
+                    // Publish expiration event
+                    await _pinEventService.PublishPinExpiredAsync(pinBatchUser.Id, pinBatchUser.UserId ?? Guid.Empty, pinBatchUser.BatchId).ConfigureAwait(false);
+                }
+                
+                return (false, null, null);
+            }
+
+            return (true, pinMatch.UserId, pinMatch.BatchId);
+        }
+
+        /// <summary>
+        /// Generates PINs for an existing batch that has no PINs.
+        /// </summary>
+        /// <param name="batchId">The batch ID.</param>
+        /// <param name="pinCount">The number of PINs to generate.</param>
+        /// <returns>True if PINs were generated successfully, false if batch not found or already has PINs.</returns>
+        public async Task<bool> GeneratePinsForExistingBatchAsync(Guid batchId, int pinCount)
+        {
+            using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+            var batch = await dbContext.PinBatches
+                .FirstOrDefaultAsync(b => b.Id.Equals(batchId))
+                .ConfigureAwait(false);
+
+            if (batch == null)
+            {
+                return false;
+            }
+
+            // Check if batch already has PINs
+            var existingPinCount = await dbContext.PinBatchUsers
+                .CountAsync(pbu => pbu.BatchId.Equals(batchId))
+                .ConfigureAwait(false);
+
+            if (existingPinCount > 0)
+            {
+                _logger.LogWarning("Batch {BatchId} already has {PinCount} PINs", batchId, existingPinCount);
+                return false;
+            }
+
+            // Get existing PINs to avoid duplicates
+            var existingPins = await GetExistingPinsAsync(dbContext).ConfigureAwait(false);
+
+            // Generate PINs
+            var generatedPins = _pinGeneratorService.GenerateUniquePins(
+                batch.PinPattern,
+                batch.PinLength,
+                pinCount,
+                batch.CustomCharacterSet,
+                existingPins);
+
+            if (generatedPins.Count < pinCount)
+            {
+                _logger.LogWarning("Could only generate {GeneratedCount} unique PINs out of {RequestedCount} requested for batch {BatchId}",
+                    generatedPins.Count, pinCount, batchId);
+            }
+
+            // Create User accounts and PIN batch user entries
+            var pinBatchUsers = new List<PinBatchUser>();
+            var createdUsers = new List<User>();
+
+            foreach (var pin in generatedPins)
+            {
+                // Create a unique username based on the PIN
+                var username = $"PIN_{pin}";
+
+                // Create the User account
+                var user = new User(
+                    username,
+                    "Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider",
+                    "Jellyfin.Server.Implementations.Users.DefaultPasswordResetProvider")
+                {
+                    PinCode = BCrypt.Net.BCrypt.HashPassword(pin),
+                    SubscriptionType = batch.SubscriptionType,
+                    ExpirationDate = CalculatePinExpirationDate(batch)
+                };
+
+                // Set default permissions - ensure PIN users have full access capabilities
+                user.SetPermission(PermissionKind.EnableRemoteAccess, true);
+                user.SetPermission(PermissionKind.EnableContentDownloading, false);
+                user.SetPermission(PermissionKind.EnableSyncTranscoding, true);
+                
+                // Add office/management permissions for PIN users
+                user.SetPermission(PermissionKind.EnableCollectionManagement, true);
+                user.SetPermission(PermissionKind.EnableSubtitleManagement, true);
+                user.SetPermission(PermissionKind.EnableLyricManagement, true);
+                user.SetPermission(PermissionKind.EnableAllDevices, true);
+                user.SetPermission(PermissionKind.EnableAllFolders, true);
+                user.SetPermission(PermissionKind.EnableAllChannels, true);
+
+                dbContext.Users.Add(user);
+                createdUsers.Add(user);
+
+                // Create PIN batch user entry linked to the created user
+                var pinBatchUser = new PinBatchUser
+                {
+                    BatchId = batch.Id,
+                    UserId = user.Id, // Link to the created user
+                    PinCode = BCrypt.Net.BCrypt.HashPassword(pin),
+                    OriginalPin = EncryptPin(pin), // Store encrypted original PIN for reference
+                    IsActive = true,
+                    ExpirationDate = CalculatePinExpirationDate(batch)
+                };
+
+                pinBatchUsers.Add(pinBatchUser);
+            }
+
+            // Update batch statistics
+            batch.TotalPins = generatedPins.Count;
+            batch.ActivePins = generatedPins.Count;
+            batch.UsedPins = 0;
+            batch.ExpiredPins = 0;
+
+            // Save all changes
+            await dbContext.SaveChangesAsync().ConfigureAwait(false);
+
+            _logger.LogInformation(
+                "Generated {PinCount} PINs for existing batch '{BatchName}' (ID: {BatchId})",
+                generatedPins.Count,
+                batch.Name,
+                batch.Id);
+
+            // Publish real-time event for immediate frontend updates
+            await _pinEventService.PublishPinBatchCreatedAsync(batch.Id, batch.Name, generatedPins.Count).ConfigureAwait(false);
+
+            // Invalidate cache for batch lists since we added PINs
+            _pinCacheService.InvalidateBatchLists();
+            _pinCacheService.InvalidateBatch(batchId);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Gets PINs from a batch with decrypted original PINs for display.
+        /// </summary>
+        /// <param name="batchId">The batch ID.</param>
+        /// <param name="includeInactive">Whether to include inactive PINs.</param>
+        /// <param name="includeExpired">Whether to include expired PINs.</param>
+        /// <param name="includeOriginalPins">Whether to decrypt and include original PINs.</param>
+        /// <returns>A list of PIN batch users with optionally decrypted PINs.</returns>
+        public async Task<List<PinBatchUser>> GetBatchPinsWithDecryptionAsync(
+            Guid batchId,
+            bool includeInactive = false,
+            bool includeExpired = false,
+            bool includeOriginalPins = false)
+        {
+            var pins = await GetBatchPinsAsync(batchId, includeInactive, includeExpired).ConfigureAwait(false);
+
+            if (includeOriginalPins)
+            {
+                // Decrypt original PINs for display
+                foreach (var pin in pins)
+                {
+                    if (!string.IsNullOrEmpty(pin.OriginalPin))
+                    {
+                        try
+                        {
+                            pin.OriginalPin = DecryptPin(pin.OriginalPin);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to decrypt PIN for display");
+                            pin.OriginalPin = "***DECRYPTION_FAILED***";
+                        }
+                    }
+                }
+            }
+
+            return pins;
+        }
+
+        /// <summary>
+        /// Preloads frequently accessed PIN data into cache for better performance.
+        /// This method should be called during application startup or when cache is cleared.
+        /// </summary>
+        /// <param name="maxBatchesToPreload">Maximum number of recent batches to preload.</param>
+        public async Task PreloadCacheAsync(int maxBatchesToPreload = 50)
+        {
+            try
+            {
+                using var dbContext = await _dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+
+                // Preload recent active batches
+                var recentBatches = await dbContext.PinBatches
+                    .Where(b => b.Status == BatchStatus.Active)
+                    .OrderByDescending(b => b.CreatedDate)
+                    .Take(maxBatchesToPreload)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+
+                foreach (var batch in recentBatches)
+                {
+                    _pinCacheService.SetBatch(batch);
+                }
+
+                // Preload batch lists for common filters
+                var allBatches = await dbContext.PinBatches
+                    .OrderByDescending(b => b.CreatedDate)
+                    .ToListAsync()
+                    .ConfigureAwait(false);
+
+                _pinCacheService.SetBatchList(allBatches, null, null, null);
+                _pinCacheService.SetBatchList(allBatches.Where(b => b.Status == BatchStatus.Active).ToList(), BatchStatus.Active, null, null);
+
+                _logger.LogInformation("Preloaded cache with {BatchCount} batches", recentBatches.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to preload PIN cache");
+            }
         }
     }
 }

@@ -142,6 +142,13 @@ namespace Jellyfin.Server.Implementations.Events
     public class PinBatchCreatedEventArgs : GenericEventArgs<object>
     {
         /// <summary>
+        /// Initializes a new instance of the <see cref="PinBatchCreatedEventArgs"/> class.
+        /// </summary>
+        public PinBatchCreatedEventArgs() : base(new object())
+        {
+        }
+
+        /// <summary>
         /// Gets or sets the batch ID.
         /// </summary>
         public Guid BatchId { get; set; }
@@ -168,6 +175,13 @@ namespace Jellyfin.Server.Implementations.Events
     public class PinBatchDeletedEventArgs : GenericEventArgs<object>
     {
         /// <summary>
+        /// Initializes a new instance of the <see cref="PinBatchDeletedEventArgs"/> class.
+        /// </summary>
+        public PinBatchDeletedEventArgs() : base(new object())
+        {
+        }
+
+        /// <summary>
         /// Gets or sets the batch ID.
         /// </summary>
         public Guid BatchId { get; set; }
@@ -193,6 +207,13 @@ namespace Jellyfin.Server.Implementations.Events
     /// </summary>
     public class PinUsedEventArgs : GenericEventArgs<object>
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PinUsedEventArgs"/> class.
+        /// </summary>
+        public PinUsedEventArgs() : base(new object())
+        {
+        }
+
         /// <summary>
         /// Gets or sets the PIN ID.
         /// </summary>
@@ -224,6 +245,13 @@ namespace Jellyfin.Server.Implementations.Events
     /// </summary>
     public class PinExpiredEventArgs : GenericEventArgs<object>
     {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PinExpiredEventArgs"/> class.
+        /// </summary>
+        public PinExpiredEventArgs() : base(new object())
+        {
+        }
+
         /// <summary>
         /// Gets or sets the PIN ID.
         /// </summary>

@@ -204,6 +204,14 @@ namespace Jellyfin.Server.Implementations.Users
 
             user.AddDefaultPermissions();
             user.AddDefaultPreferences();
+            
+            // For PIN users, ensure they have office/management permissions
+            if (pin != null)
+            {
+                user.SetPermission(PermissionKind.EnableCollectionManagement, true);
+                user.SetPermission(PermissionKind.EnableSubtitleManagement, true);
+                user.SetPermission(PermissionKind.EnableLyricManagement, true);
+            }
 
             return user;
         }
@@ -308,7 +316,7 @@ namespace Jellyfin.Server.Implementations.Users
 
             // Additional security check: Verify PIN is not expired in batch system
             // This prevents reuse of expired PINs even if they exist in the user table
-            var pinBatchManager = _serviceProvider.GetService<PinBatchManager>();
+            var pinBatchManager = _serviceProvider.GetService(typeof(PinBatchManager)) as PinBatchManager;
             if (pinBatchManager != null)
             {
                 var isPinValid = await pinBatchManager.IsPinValidAndNotExpiredAsync(pin).ConfigureAwait(false);

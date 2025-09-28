@@ -490,6 +490,7 @@ namespace Jellyfin.Api.Controllers
         /// <param name="batchId">The batch ID.</param>
         /// <param name="includeInactive">Whether to include inactive PINs.</param>
         /// <param name="includeExpired">Whether to include expired PINs.</param>
+        /// <param name="includeOriginalPins">Whether to include decrypted original PINs. WARNING: This exposes sensitive PIN data.</param>
         /// <response code="200">PINs returned successfully.</response>
         /// <returns>A list of PIN batch users.</returns>
         [HttpGet("{batchId}/Pins")]
@@ -497,11 +498,12 @@ namespace Jellyfin.Api.Controllers
         public async Task<ActionResult<List<PinBatchUserDto>>> GetBatchPins(
             [FromRoute, Required] Guid batchId,
             [FromQuery] bool includeInactive = false,
-            [FromQuery] bool includeExpired = false)
+            [FromQuery] bool includeExpired = false,
+            [FromQuery] bool includeOriginalPins = false)
         {
             try
             {
-                var pins = await _pinBatchManager.GetBatchPinsAsync(batchId, includeInactive, includeExpired).ConfigureAwait(false);
+                var pins = await _pinBatchManager.GetBatchPinsWithDecryptionAsync(batchId, includeInactive, includeExpired, includeOriginalPins).ConfigureAwait(false);
 
                 var response = pins.Select(pin => new PinBatchUserDto
                 {
@@ -518,7 +520,8 @@ namespace Jellyfin.Api.Controllers
                     DeactivationReason = pin.DeactivationReason,
                     Metadata = pin.Metadata,
                     LastLoginIp = pin.LastLoginIp,
-                    LastLoginDevice = pin.LastLoginDevice
+                    LastLoginDevice = pin.LastLoginDevice,
+                    OriginalPin = includeOriginalPins ? pin.OriginalPin : null
                 }).ToList();
 
                 return Ok(response);
@@ -527,6 +530,46 @@ namespace Jellyfin.Api.Controllers
             {
                 _logger.LogError(ex, "Error retrieving PINs for batch {BatchId}", batchId);
                 return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while retrieving PINs.");
+            }
+        }
+
+        /// <summary>
+        /// Generates PINs for an existing batch that has no PINs.
+        /// </summary>
+        /// <param name="batchId">The batch ID.</param>
+        /// <param name="pinCount">The number of PINs to generate.</param>
+        /// <response code="200">PINs generated successfully.</response>
+        /// <response code="404">Batch not found.</response>
+        /// <response code="400">Batch already has PINs or invalid request.</response>
+        /// <returns>Success response.</returns>
+        [HttpPost("{batchId}/GeneratePins")]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<string>> GeneratePinsForBatch(
+            [FromRoute, Required] Guid batchId,
+            [FromBody, Required] GeneratePinsRequest request)
+        {
+            try
+            {
+                if (request.PinCount <= 0)
+                {
+                    return BadRequest("PIN count must be positive.");
+                }
+
+                var success = await _pinBatchManager.GeneratePinsForExistingBatchAsync(batchId, request.PinCount).ConfigureAwait(false);
+
+                if (!success)
+                {
+                    return BadRequest("Failed to generate PINs. Batch may not exist or already has PINs.");
+                }
+
+                return Ok($"Successfully generated {request.PinCount} PINs for the batch.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error generating PINs for batch {BatchId}", batchId);
+                return StatusCode(StatusCodes.Status500InternalServerError, "An error occurred while generating PINs.");
             }
         }
 
@@ -543,7 +586,7 @@ namespace Jellyfin.Api.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<ActionResult> ExportBatchToExcel(
             [FromRoute, Required] Guid batchId,
-            [FromQuery] bool includeOriginalPins = false)
+            [FromQuery] bool includeOriginalPins = true)
         {
             try
             {
@@ -553,7 +596,7 @@ namespace Jellyfin.Api.Controllers
                     return NotFound("Batch not found.");
                 }
 
-                var pins = await _pinBatchManager.GetBatchPinsAsync(batchId, true, true).ConfigureAwait(false);
+                var pins = await _pinBatchManager.GetBatchPinsWithDecryptionAsync(batchId, true, true, includeOriginalPins).ConfigureAwait(false);
                 var excelStream = await _excelExportService.ExportPinBatchToExcelAsync(batch, pins, includeOriginalPins).ConfigureAwait(false);
 
                 var fileName = $"PIN_Batch_{SanitizeFileName(batch.Name)}_{DateTime.UtcNow:yyyyMMdd_HHmmss}.xlsx";

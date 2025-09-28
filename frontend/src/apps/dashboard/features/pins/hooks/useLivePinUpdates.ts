@@ -51,14 +51,35 @@ const useLivePinUpdates = () => {
             });
         };
 
+        const onUserCreated = (_e: Event, _apiClient: ApiClient, data: any) => {
+            console.log('User created:', data);
+            // Invalidate user queries to refresh the users list
+            void queryClient.invalidateQueries({
+                queryKey: ['Users']
+            });
+        };
+
+        const onUserDeleted = (_e: Event, _apiClient: ApiClient, data: any) => {
+            console.log('User deleted:', data);
+            // Invalidate user queries to refresh the users list
+            void queryClient.invalidateQueries({
+                queryKey: ['Users']
+            });
+        };
+
         // Register event listeners for PIN-related events
         Events.on(serverNotifications, 'PinBatchCreated', onPinBatchCreated);
         Events.on(serverNotifications, 'PinBatchDeleted', onPinBatchDeleted);
         Events.on(serverNotifications, 'PinUsed', onPinUsed);
         Events.on(serverNotifications, 'PinExpired', onPinExpired);
+        
+        // Register event listeners for user-related events
+        Events.on(serverNotifications, 'UserCreated', onUserCreated);
+        Events.on(serverNotifications, 'UserDeleted', onUserDeleted);
 
         // Start listening for PIN events via WebSocket
-        __legacyApiClient__?.sendMessage(SessionMessageType.PinEventsStart, '1000,1000');
+        // Note: PIN events are handled via general events for now
+        // __legacyApiClient__?.sendMessage(SessionMessageType.PinEventsStart, '1000,1000');
 
         return () => {
             // Clean up event listeners
@@ -66,9 +87,12 @@ const useLivePinUpdates = () => {
             Events.off(serverNotifications, 'PinBatchDeleted', onPinBatchDeleted);
             Events.off(serverNotifications, 'PinUsed', onPinUsed);
             Events.off(serverNotifications, 'PinExpired', onPinExpired);
+            Events.off(serverNotifications, 'UserCreated', onUserCreated);
+            Events.off(serverNotifications, 'UserDeleted', onUserDeleted);
 
             // Stop listening for PIN events
-            __legacyApiClient__?.sendMessage(SessionMessageType.PinEventsStop, null);
+            // Note: PIN events are handled via general events for now
+            // __legacyApiClient__?.sendMessage(SessionMessageType.PinEventsStop, null);
         };
     }, [__legacyApiClient__]);
 };

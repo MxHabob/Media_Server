@@ -242,17 +242,10 @@ namespace Jellyfin.Server.Implementations.Export
                 
                 if (includeOriginalPins)
                 {
-                    try
-                    {
-                        var originalPin = DecryptPin(pin.OriginalPin);
-                        // SECURITY WARNING: PIN codes are highly confidential and should not be exposed
-                        // This export should only be used by authorized administrators
-                        worksheet.Cells[row, col++].Value = originalPin;
-                    }
-                    catch
-                    {
-                        worksheet.Cells[row, col++].Value = "N/A";
-                    }
+                    // PINs are already decrypted by the PinBatchManager
+                    // SECURITY WARNING: PIN codes are highly confidential and should not be exposed
+                    // This export should only be used by authorized administrators
+                    worksheet.Cells[row, col++].Value = pin.OriginalPin ?? "N/A";
                 }
                 
                 worksheet.Cells[row, col++].Value = pin.UserId.ToString();

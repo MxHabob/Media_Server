@@ -58,6 +58,7 @@ export type PinBatchUser = {
     Metadata?: string;
     LastLoginIp?: string;
     LastLoginDevice?: string;
+    OriginalPin?: string;
 };
 
 export type CreatePinBatchRequest = {
@@ -69,6 +70,7 @@ export type CreatePinBatchRequest = {
     PinCount: number;
     CustomCharacterSet?: string;
     ExpirationDate?: string;
+    CustomDurationHours?: number;
     MaxConcurrentSessions?: number;
     AllowRemoteAccess: boolean;
     AllowTranscoding: boolean;

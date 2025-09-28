@@ -17,6 +17,7 @@ using Jellyfin.Server.Implementations.Subscriptions;
 using Jellyfin.Server.Implementations.Trickplay;
 using Jellyfin.Server.Implementations.Users;
 using Jellyfin.Server.Implementations.PinGeneration;
+using Jellyfin.Server.Implementations.Caching;
 using Jellyfin.Server.Implementations.Export;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Authentication;
@@ -86,6 +87,8 @@ namespace Jellyfin.Server
             serviceCollection.AddSingleton<IUserManager, UserManager>();
             serviceCollection.AddSingleton<ISubscriptionManager, SubscriptionManager>();
             serviceCollection.AddSingleton<PinGeneratorService>();
+            serviceCollection.AddSingleton<PinEventService>();
+            serviceCollection.AddSingleton<PinCacheService>();
             serviceCollection.AddSingleton<PinBatchManager>();
             serviceCollection.AddSingleton<ExcelExportService>();
             serviceCollection.AddSingleton<IAuthenticationProvider, DefaultAuthenticationProvider>();

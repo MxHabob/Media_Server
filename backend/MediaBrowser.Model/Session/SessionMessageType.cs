@@ -20,6 +20,7 @@ namespace MediaBrowser.Model.Session
         ServerShuttingDown,
         ServerRestarting,
         LibraryChanged,
+        UserCreated,
         UserDeleted,
         UserUpdated,
         SeriesTimerCreated,

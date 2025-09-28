@@ -198,7 +198,7 @@ namespace Jellyfin.Server.Implementations.Caching
         public void InvalidateBatchLists()
         {
             var keysToRemove = _cacheTimestamps.Keys
-                .Where(k => k.StartsWith(BatchListKeyPrefix))
+                .Where(k => k.StartsWith(BatchListKeyPrefix, StringComparison.Ordinal))
                 .ToList();
 
             foreach (var key in keysToRemove)
@@ -216,10 +216,10 @@ namespace Jellyfin.Server.Implementations.Caching
         public void ClearAll()
         {
             var keysToRemove = _cacheTimestamps.Keys
-                .Where(k => k.StartsWith(BatchKeyPrefix) || 
-                           k.StartsWith(BatchListKeyPrefix) || 
-                           k.StartsWith(StatisticsKeyPrefix) ||
-                           k.StartsWith(UserPinKeyPrefix))
+                .Where(k => k.StartsWith(BatchKeyPrefix, StringComparison.Ordinal) || 
+                           k.StartsWith(BatchListKeyPrefix, StringComparison.Ordinal) || 
+                           k.StartsWith(StatisticsKeyPrefix, StringComparison.Ordinal) ||
+                           k.StartsWith(UserPinKeyPrefix, StringComparison.Ordinal))
                 .ToList();
 
             foreach (var key in keysToRemove)
@@ -247,9 +247,9 @@ namespace Jellyfin.Server.Implementations.Caching
                 TotalCacheEntries = totalEntries,
                 ExpiredCacheEntries = expiredEntries,
                 ActiveCacheEntries = totalEntries - expiredEntries,
-                BatchCacheEntries = _cacheTimestamps.Count(k => k.Key.StartsWith(BatchKeyPrefix)),
-                StatisticsCacheEntries = _cacheTimestamps.Count(k => k.Key.StartsWith(StatisticsKeyPrefix)),
-                BatchListCacheEntries = _cacheTimestamps.Count(k => k.Key.StartsWith(BatchListKeyPrefix))
+                BatchCacheEntries = _cacheTimestamps.Count(k => k.Key.StartsWith(BatchKeyPrefix, StringComparison.Ordinal)),
+                StatisticsCacheEntries = _cacheTimestamps.Count(k => k.Key.StartsWith(StatisticsKeyPrefix, StringComparison.Ordinal)),
+                BatchListCacheEntries = _cacheTimestamps.Count(k => k.Key.StartsWith(BatchListKeyPrefix, StringComparison.Ordinal))
             };
         }
 

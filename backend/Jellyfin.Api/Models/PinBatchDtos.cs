@@ -348,6 +348,23 @@ namespace Jellyfin.Api.Models.PinBatchDtos
         /// Gets or sets the last login device.
         /// </summary>
         public string? LastLoginDevice { get; set; }
+
+        /// <summary>
+        /// Gets or sets the original PIN code (decrypted for display).
+        /// WARNING: This field contains sensitive information and should only be included when explicitly requested.
+        /// </summary>
+        public string? OriginalPin { get; set; }
+    }
+
+    /// <summary>
+    /// Request to generate PINs for an existing batch.
+    /// </summary>
+    public class GeneratePinsRequest
+    {
+        /// <summary>
+        /// Gets or sets the number of PINs to generate.
+        /// </summary>
+        public int PinCount { get; set; }
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using Jellyfin.Data.Events.System;
 using Jellyfin.Data.Events.Users;
 using Jellyfin.Server.Implementations.Events.Consumers.Library;
+using Jellyfin.Server.Implementations.Events.Consumers.Pin;
 using Jellyfin.Server.Implementations.Events.Consumers.Security;
 using Jellyfin.Server.Implementations.Events.Consumers.Session;
 using Jellyfin.Server.Implementations.Events.Consumers.System;
@@ -62,11 +63,18 @@ namespace Jellyfin.Server.Implementations.Events
 
             // User consumers
             collection.AddScoped<IEventConsumer<UserCreatedEventArgs>, UserCreatedLogger>();
+            collection.AddScoped<IEventConsumer<UserCreatedEventArgs>, UserCreatedNotifier>();
             collection.AddScoped<IEventConsumer<UserDeletedEventArgs>, UserDeletedLogger>();
             collection.AddScoped<IEventConsumer<UserDeletedEventArgs>, UserDeletedNotifier>();
             collection.AddScoped<IEventConsumer<UserLockedOutEventArgs>, UserLockedOutLogger>();
             collection.AddScoped<IEventConsumer<UserPasswordChangedEventArgs>, UserPasswordChangedLogger>();
             collection.AddScoped<IEventConsumer<UserUpdatedEventArgs>, UserUpdatedNotifier>();
+
+            // PIN consumers
+            collection.AddScoped<IEventConsumer<PinBatchCreatedEventArgs>, PinBatchCreatedNotifier>();
+            collection.AddScoped<IEventConsumer<PinBatchDeletedEventArgs>, PinBatchDeletedNotifier>();
+            collection.AddScoped<IEventConsumer<PinUsedEventArgs>, PinUsedNotifier>();
+            collection.AddScoped<IEventConsumer<PinExpiredEventArgs>, PinExpiredNotifier>();
         }
     }
 }

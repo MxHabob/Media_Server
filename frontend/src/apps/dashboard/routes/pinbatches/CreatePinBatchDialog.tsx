@@ -35,13 +35,13 @@ interface CreatePinBatchDialogProps {
 
 export default function CreatePinBatchDialog({ open, onClose }: CreatePinBatchDialogProps) {
     const { __legacyApiClient__ } = useApi();
-    
+
     const [formData, setFormData] = useState<CreatePinBatchRequest>({
         Name: '',
         Description: '',
-        SubscriptionType: 9, // Custom
-        CustomDurationHours: 24, // Default 24 hours
-        PinPattern: 0, // Numeric
+        SubscriptionType: 9,
+        CustomDurationHours: 24,
+        PinPattern: 0,
         PinLength: 6,
         PinCount: 10,
         CustomCharacterSet: '',
@@ -67,8 +67,8 @@ export default function CreatePinBatchDialog({ open, onClose }: CreatePinBatchDi
             setFormData({
                 Name: '',
                 Description: '',
-                SubscriptionType: 9, // Custom
-                CustomDurationHours: 24, // Default 24 hours
+                SubscriptionType: 9, 
+                CustomDurationHours: 24,
                 PinPattern: 0,
                 PinLength: 6,
                 PinCount: 10,
@@ -98,7 +98,7 @@ export default function CreatePinBatchDialog({ open, onClose }: CreatePinBatchDi
             const value = event.target.type === 'checkbox' 
                 ? event.target.checked 
                 : event.target.value;
-            
+
             setFormData(prev => ({
                 ...prev,
                 [field]: value
@@ -177,7 +177,7 @@ export default function CreatePinBatchDialog({ open, onClose }: CreatePinBatchDi
                             disabled={createMutation.isPending}
                         />
                     </Grid>
-                    
+
                     <Grid item xs={12} sm={6}>
                         <TextField
                             fullWidth

@@ -14,6 +14,7 @@ import '../../../../components/cardbuilder/card.scss';
 import '../../../../components/indicators/indicators.scss';
 import '../../../../styles/flexstyles.scss';
 import Page from '../../../../components/Page';
+import useLivePinUpdates from '../../features/pins/hooks/useLivePinUpdates';
 
 type MenuEntry = {
     name?: string;
@@ -25,6 +26,9 @@ const UserProfiles = () => {
     const [ users, setUsers ] = useState<UserDto[]>([]);
 
     const element = useRef<HTMLDivElement>(null);
+
+    // Enable real-time updates for users
+    useLivePinUpdates();
 
     const loadData = () => {
         loading.show();

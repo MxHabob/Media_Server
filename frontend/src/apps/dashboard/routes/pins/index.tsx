@@ -274,12 +274,20 @@ export const Component = () => {
     const onExportBatch = useCallback((batchId: string) => {
         if (!__legacyApiClient__) return;
 
-        const includeOriginalPins = window.confirm('Include original PINs in export? (This will show the actual PIN codes)');
-        exportPinBatch.mutate({
-            apiClient: __legacyApiClient__,
-            batchId: batchId,
-            includeOriginalPins: includeOriginalPins
-        });
+        // Show security warning before export
+        const confirmed = window.confirm(
+            'Security Warning: This export will include PIN codes which are highly confidential.\n\n'
+            + 'Only authorized administrators should access this data.\n\n'
+            + 'Do you want to proceed with the export?'
+        );
+
+        if (confirmed) {
+            exportPinBatch.mutate({
+                apiClient: __legacyApiClient__,
+                batchId: batchId,
+                includeOriginalPins: true
+            });
+        }
     }, [__legacyApiClient__, exportPinBatch]);
 
     const onDeactivateAllBatchPins = useCallback((batchId: string, batchName: string) => {
